@@ -4,7 +4,7 @@ import solc from 'solc';
 import Web3 from 'web3';
 
 const SOLC_VERSION = '0.8.19';
-const FILE_PATH = 'ERC20TokenStandardContract.sol';
+const FILE_PATH = 'PrivateERC20Contract.sol';
 const PROVIDER_URL = 'http://localhost:7000';
 const INITIAL_BALANCE = 500000000
 

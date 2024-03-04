@@ -10,7 +10,7 @@ from crypto import decrypt, prepare_IT
 import subprocess
 
 SOLC_VERSION = '0.8.19'
-FILE_PATH = 'ERC20TokenStandardContract.sol'
+FILE_PATH = 'PrivateERC20Contract.sol'
 PROVIDER_URL = 'http://localhost:7000'
 INITIAL_BALANCE = 500000000
 

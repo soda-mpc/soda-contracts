@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "../../lib/solidity/MpcCore.sol";
+import "./MpcCore.sol";
 
 // The provided Solidity contract is an implementation of an ERC20 token standard with enhanced privacy features. 
 // It aims to ensure the confidentiality of token transactions through encryption techniques while maintaining compatibility with the ERC20 standard.
@@ -17,7 +17,7 @@ import "../../lib/solidity/MpcCore.sol";
 // The contract provides multiple transfer methods, allowing token transfers in both encrypted and clear (unencrypted) forms. Transfers can occur between addresses with encrypted token values or clear token values.
 // Approval Mechanism:
 // An approval mechanism is implemented to allow token holders to grant spending permissions (allowances) to other addresses. Approvals are also encrypted to maintain transaction privacy.
-contract ERC20TokenStandardContract {
+contract PrivateERC20Contract {
 
     // Events are emitted for token transfers (Transfer) and approvals (Approval). These events provide transparency and allow external observers to track token movements within the contract.
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
@@ -44,9 +44,9 @@ contract ERC20TokenStandardContract {
     // params: name: the name of the token
     //         symbol: the symbol of the token
     //         initialSupply: the initial supply of the token assigned to the contract creator
-    constructor(string memory name, string memory symbol, uint64 initialSupply) public {
-        _name = name;
-        _symbol = symbol;
+    constructor(string memory name_, string memory symbol_, uint64 initialSupply) {
+        _name = name_;
+        _symbol = symbol_;
         _totalSupply = initialSupply;
         balances[msg.sender] = MpcCore.offBoard(MpcCore.setPublic64(initialSupply));
     }
@@ -184,7 +184,7 @@ contract ERC20TokenStandardContract {
     //         _value: the encrypted value of the amount to transfer
     // returns: The encrypted result of the transfer.
     function contractTransferFrom(address _from, address _to, gtUint64 _value) public returns (gtBool success){
-        (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(msg.sender, _to);
+        (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(_from, _to);
         gtUint64 allowance = MpcCore.onBoard(getGTAllowance(_from, msg.sender));
         (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result, gtUint64 newAllowance) = MpcCore.transferWithAllowance(fromBalance, toBalance, _value, allowance);
 
@@ -201,7 +201,7 @@ contract ERC20TokenStandardContract {
     //         _value: the value of the amount to transfer
     // returns: The encrypted result of the transfer.
     function contractTransferFromClear(address _from, address _to, uint64 _value) public returns (gtBool success){
-        (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(msg.sender, _to);
+        (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(_from, _to);
         gtUint64 allowance = MpcCore.onBoard(getGTAllowance(_from, msg.sender));
         (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result, gtUint64 newAllowance) = MpcCore.transferWithAllowance(fromBalance, toBalance, _value, allowance);
 
@@ -214,7 +214,7 @@ contract ERC20TokenStandardContract {
 
     // Returns the encrypted balances of the two addresses
     function getBalances(address _from, address _to) private returns (gtUint64, gtUint64){
-        ctUint64 fromBalance = balances[msg.sender];
+        ctUint64 fromBalance = balances[_from];
         ctUint64 toBalance = balances[_to];
 
         gtUint64 gtFromBalance;
