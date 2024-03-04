@@ -7,6 +7,8 @@ interface ExtendedOperations {
     function OffBoard(bytes1 metaData, uint256 ct) external returns (uint256 result);
     function OffBoardToUser(bytes1 metaData, uint256 ct, bytes calldata addr) external returns (uint256 result);
     function SetPublic(bytes1 metaData, uint256 ct) external returns (uint256 result);
+    function Rand(bytes1 metaData) external returns (uint256 result);
+    function RandBoundedBits(bytes1 metaData, uint8 numBits) external returns (uint256 result);
 
     function Add(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 result);
     function Sub(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 result);
