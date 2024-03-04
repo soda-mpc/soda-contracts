@@ -5,8 +5,8 @@ from eth_account import Account
 from solcx import compile_standard, install_solc, get_installed_solc_versions
 from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
-sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '../../tools/python')))
-from crypto import generate_rsa_keypair, decrypt_rsa, sign
+from tools.python.crypto import generate_rsa_keypair, decrypt_rsa, sign
+from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL
 
 SOLC_VERSION = '0.8.19'
 FILE_PATH = 'GetUserKeyContract.sol'
@@ -73,29 +73,42 @@ def execute_transaction(w3, account, contract, function, gas_limit=2000000, gas_
 
 
 def main():
-    check_and_install_solc_version(SOLC_VERSION)
-    solidity_code = read_solidity_code(FILE_PATH)
+    # check_and_install_solc_version(SOLC_VERSION)
+    # solidity_code = read_solidity_code(FILE_PATH)
 
-    mpc_inst_path = "../../lib/solidity/MPCInst.sol"
-    mpc_core_path = "../../lib/solidity/MpcCore.sol"
-    compiled_sol = compile_solidity(SOLC_VERSION, FILE_PATH, solidity_code, mpc_inst_path, mpc_core_path)
+    # mpc_inst_path = "../../lib/solidity/MPCInst.sol"
+    # mpc_core_path = "../../lib/solidity/MpcCore.sol"
+    # compiled_sol = compile_solidity(SOLC_VERSION, FILE_PATH, solidity_code, mpc_inst_path, mpc_core_path)
 
-    contract_name = FILE_PATH.split('.')[0]
-    bytecode = compiled_sol['contracts'][FILE_PATH][contract_name]['evm']['bytecode']['object']
-    contract_abi = json.loads(compiled_sol['contracts'][FILE_PATH][contract_name]['metadata'])['output']['abi']
-    contract_bytecode = f'0x{bytecode}'
+    # contract_name = FILE_PATH.split('.')[0]
+    # bytecode = compiled_sol['contracts'][FILE_PATH][contract_name]['evm']['bytecode']['object']
+    # contract_abi = json.loads(compiled_sol['contracts'][FILE_PATH][contract_name]['metadata'])['output']['abi']
+    # contract_bytecode = f'0x{bytecode}'
 
-    w3 = Web3(HTTPProvider(PROVIDER_URL))
-    if not w3.is_connected():
-        print("Failed to connect to the node.")
-        exit()
+    # w3 = Web3(HTTPProvider(PROVIDER_URL))
+    # if not w3.is_connected():
+    #     print("Failed to connect to the node.")
+    #     exit()
 
-    w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+    # w3.middleware_onion.inject(geth_poa_middleware, layer=0)
     signing_key = os.environ.get('SIGNING_KEY')
-    account = Account.from_key(signing_key)
-    w3.eth.default_account = account.address
+    print(f'Signing key is {signing_key}')
+    # account = Account.from_key(signing_key)
+
+    soda_helper = SodaWeb3Helper(signing_key, LOCAL_PROVIDER_URL)
+
+    success = soda_helper.setup_contract("onboardUser/contracts/" + FILE_PATH, "onboard_user")
+    if not success:
+        print("Failed to set up the contract")
+
+    receipt = soda_helper.deploy_contract("onboard_user", constructor_args=[])
+    if receipt is None:
+        print("Failed to deploy the contract")
+
+    contract = soda_helper.get_contract("onboard_user")
+    # w3.eth.default_account = account.address
     
-    contract = deploy_contract(w3, account, contract_abi, contract_bytecode)
+    # contract = deploy_contract(w3, account, contract_abi, contract_bytecode)
 
     # Generate new RSA key pair
     private_key, public_key = generate_rsa_keypair()
@@ -104,8 +117,12 @@ def main():
 
     # Call the getUserKey function to get the encrypted AES key
     function = contract.functions.getUserKey(public_key, signedEK)
-    execute_transaction(w3, account, contract, function)
-    encryptedKey = contract.functions.getSavedUserKey().call({'from': account.address})
+    soda_helper.call_contract_transaction("onboard_user", "getUserKey", func_args=[public_key, signedEK])
+    if receipt is None:
+        print("Failed to call the transaction function")
+        return
+    # execute_transaction(w3, account, contract, function)
+    encryptedKey = contract.functions.getSavedUserKey().call()
     
     # Decrypt the aes key using the RSA private key
     decrypted_aes_key = decrypt_rsa(private_key, encryptedKey)
@@ -113,7 +130,7 @@ def main():
     print("user AES key:", decrypted_aes_key.hex())
 
     # Write the data to a .env file
-    with open('../../.env', 'a') as f:
+    with open('.env', 'a') as f:
         f.write(f"export USER_KEY='{decrypted_aes_key.hex()}'\n")
 
 
