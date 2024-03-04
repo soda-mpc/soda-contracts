@@ -35,7 +35,6 @@ def execute_and_check_balance(soda_helper, account, contract, function, user_key
     receipt = soda_helper.call_contract_function_transaction("erc20", function)
     if receipt is None:
         print("Failed to call the transaction function")
-        return
     # Get my encrypted balance, decrypt it and check if it matches the expected value
     my_CTBalance = contract.functions.balanceOf().call({'from': account.address})
     my_balance = decrypt_value(my_CTBalance, user_key)

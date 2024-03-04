@@ -47,6 +47,9 @@ class SodaWeb3Helper:
             return None
         return self.contracts[contract_id]
 
+    def get_account(self):
+        return self.account
+
     
     def deploy_contract(self, 
                         contract_id, 
@@ -60,7 +63,6 @@ class SodaWeb3Helper:
             account = self.account
         
         print(f'Contract id: {contract_id}, Gas limit: {gas_limit}, Gas price: {gas_price}, Chain id: {chain_id}')
-        print(f'Constructor args: {constructor_args}')
         func_to_call = self.contracts[contract_id].constructor
         construct_txn = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, constructor_args, account)
         receipt = self._sign_and_send_transaction(construct_txn, account)
@@ -76,8 +78,6 @@ class SodaWeb3Helper:
             print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
             return None
         
-        print(f'Calling contract {contract_id} function {func_name} with args: {func_args}')
-        
         contract = self.contracts[contract_id]
         func = getattr(contract.functions, func_name)
         return func(*func_args).call()
@@ -85,14 +85,14 @@ class SodaWeb3Helper:
     def call_contract_transaction(self, 
                                   contract_id, 
                                   func_name, 
-                                  gas_limit=2000000, 
+                                  gas_limit=4000000, 
                                   gas_price=DEFAULT_GAS_PRICE, 
                                   chain_id=DEFAULT_CHAIN_ID, 
                                   func_args=[], 
                                   account=None):
         if account is None:
             account = self.account
-        
+
         if contract_id not in self.contracts:
             print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
             return None
@@ -168,7 +168,6 @@ class SodaWeb3Helper:
         if account is None:
             account = self.account
 
-        print(f'Build transaction with args: {tx_args}')
         return func(*tx_args).build_transaction({
             'from': account.address,
             'chainId': chain_id,

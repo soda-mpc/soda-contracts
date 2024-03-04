@@ -1,10 +1,4 @@
-import json
 import os
-import sys
-from eth_account import Account
-from solcx import compile_standard, install_solc, get_installed_solc_versions
-from web3 import Web3, HTTPProvider
-from web3.middleware import geth_poa_middleware
 from tools.python.crypto import generate_rsa_keypair, decrypt_rsa, sign
 from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL
 
