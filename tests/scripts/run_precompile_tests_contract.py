@@ -6,7 +6,7 @@ from eth_account import Account
 from solcx import compile_standard, install_solc, get_installed_solc_versions
 from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
-sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '../tools/python')))
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '../../tools/python')))
 from crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, decrypt_rsa, encrypt_rsa, sign, decrypt
 
 # Specify the Solidity version
@@ -16,6 +16,7 @@ SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol',
                   'PrecompilesBitwiseTestsContract.sol', 
                   'PrecompilesComparison2TestsContract.sol', 
                   'PrecompilesMiscellaneousTestsContract.sol',
+                  'PrecompilesMiscellaneous1TestsContract.sol',
                   'PrecompilesTransferTestsContract.sol', 
                   'PrecompilesTransferScalarTestsContract.sol', 
                   'PrecompilesMinMaxTestsContract.sol', 
@@ -33,17 +34,14 @@ def check_and_install_solc_version(solc_version):
 
 def read_solidity_code():
     # Ensure the file paths are valid
-    for file_name in SOLIDITY_FILES:
-        contracts_dir = os.path.join(os.getcwd(), 'contracts')
-        file_path = os.path.join(contracts_dir, file_name)
-        if not os.path.exists(file_path):
+    for file_path in SOLIDITY_FILES:
+        if not os.path.exists("../contracts/" + file_path):
             raise Exception(f"The file {file_path} does not exist")
 
     # Read the Solidity source code from the files
     solidity_sources = {}
-    for file_name in SOLIDITY_FILES:
-        contracts_dir = os.path.join(os.getcwd(), 'contracts')
-        file_path = os.path.join(contracts_dir, file_name)
+    for file_path in SOLIDITY_FILES:
+        file_path = "../contracts/" + file_path
         with open(file_path, 'r') as file:
             solidity_sources[file_path] = file.read()
     
@@ -55,16 +53,17 @@ def compile_solidity(solidity_sources, mpc_inst_path, mpc_core_path):
         "sources": {
             "MPCInst.sol": {"urls": [mpc_inst_path]},
             "MpcCore.sol": {"urls": [mpc_core_path]},
-            SOLIDITY_FILES[0]: {"content": solidity_sources[SOLIDITY_FILES[0]]}, 
-            SOLIDITY_FILES[1]: {"content": solidity_sources[SOLIDITY_FILES[1]]}, 
-            SOLIDITY_FILES[2]: {"content": solidity_sources[SOLIDITY_FILES[2]]}, 
-            SOLIDITY_FILES[3]: {"content": solidity_sources[SOLIDITY_FILES[3]]}, 
-            SOLIDITY_FILES[4]: {"content": solidity_sources[SOLIDITY_FILES[4]]}, 
-            SOLIDITY_FILES[5]: {"content": solidity_sources[SOLIDITY_FILES[5]]}, 
-            SOLIDITY_FILES[6]: {"content": solidity_sources[SOLIDITY_FILES[6]]}, 
-            SOLIDITY_FILES[7]: {"content": solidity_sources[SOLIDITY_FILES[7]]}, 
-            SOLIDITY_FILES[8]: {"content": solidity_sources[SOLIDITY_FILES[8]]}, 
-            SOLIDITY_FILES[9]: {"content": solidity_sources[SOLIDITY_FILES[9]]}, 
+            SOLIDITY_FILES[0]: {"content": solidity_sources["../contracts/" + SOLIDITY_FILES[0]]}, 
+            SOLIDITY_FILES[1]: {"content": solidity_sources["../contracts/" + SOLIDITY_FILES[1]]}, 
+            SOLIDITY_FILES[2]: {"content": solidity_sources["../contracts/" + SOLIDITY_FILES[2]]}, 
+            SOLIDITY_FILES[3]: {"content": solidity_sources["../contracts/" + SOLIDITY_FILES[3]]}, 
+            SOLIDITY_FILES[4]: {"content": solidity_sources["../contracts/" + SOLIDITY_FILES[4]]}, 
+            SOLIDITY_FILES[5]: {"content": solidity_sources["../contracts/" + SOLIDITY_FILES[5]]}, 
+            SOLIDITY_FILES[6]: {"content": solidity_sources["../contracts/" + SOLIDITY_FILES[6]]}, 
+            SOLIDITY_FILES[7]: {"content": solidity_sources["../contracts/" + SOLIDITY_FILES[7]]}, 
+            SOLIDITY_FILES[8]: {"content": solidity_sources["../contracts/" + SOLIDITY_FILES[8]]}, 
+            SOLIDITY_FILES[9]: {"content": solidity_sources["../contracts/" + SOLIDITY_FILES[9]]}, 
+            SOLIDITY_FILES[10]: {"content": solidity_sources["../contracts/" + SOLIDITY_FILES[10]]}, 
             # Add other Solidity files as needed
         },
         "settings": {
@@ -77,7 +76,7 @@ def compile_solidity(solidity_sources, mpc_inst_path, mpc_core_path):
         },
     },
     solc_version=SOLC_VERSION,
-    allow_paths=[".", "../solidity_lib"]
+    allow_paths=[".", "../../lib/solidity"]
     )
     return compiled_sol
 
@@ -317,9 +316,32 @@ def test_getUserKey(w3, account, contract, a, expected_result):
     checkCt(ct32, decrypted_aes_key, expected_result)
     checkCt(ct64, decrypted_aes_key, expected_result)
 
-    
+last_random_result = 0
+
+def test_random(w3, account, contract):
+    global last_random_result  # Use the global keyword to use and modify the global variable
+    function = contract.functions.randomTest()
+    execute_transaction(w3, account, contract, function)
+    result = contract.functions.getRandom().call()
+    if result != last_random_result:
+        print(f'Test Random succeeded: {result}')
+        last_random_result = result
+    else:
+        raise ValueError(f'Test Random failed.')
+
+def test_randomBoundedBits(w3, account, contract, numBits):
+    global last_random_result  # Use the global keyword to use and modify the global variable
+    function = contract.functions.randomBoundedTest(numBits)
+    execute_transaction(w3, account, contract, function)
+    result = contract.functions.getRandom().call()
+    if result != last_random_result:
+        print(f'Test RandomBoundedBits succeeded: {result}')
+        last_random_result = result
+    else:
+        raise ValueError(f'Test RandomBoundedBits failed.')
+
 # Main test function
-def run_tests(contract_instances, account, w3, a, b, shift, bit):
+def run_tests(contract_instances, account, w3, a, b, shift, bit, numBits):
     # Test Addition
     test_addition(w3, account, contract_instances['PrecompilesArythmeticTestsContract.sol'], a, b, a + b)
     
@@ -392,30 +414,29 @@ def run_tests(contract_instances, account, w3, a, b, shift, bit):
     # test getUserKey
     test_getUserKey(w3, account, contract_instances['PrecompilesOffboardToUserKeyTestContract.sol'], a, a)
 
+    # test random
+    test_random(w3, account, contract_instances['PrecompilesMiscellaneous1TestsContract.sol'])
+
+    # test random bounded bits
+    test_randomBoundedBits(w3, account, contract_instances['PrecompilesMiscellaneous1TestsContract.sol'], numBits)
+
 
 def runTestVectors(contract_instances, account, w3):
 
     print(f'\nTest Vector 0\n')
 
     #  test vector 0
-    run_tests(contract_instances, account, w3, 10, 5, 2, False)
+    run_tests(contract_instances, account, w3, 10, 5, 2, False, 7)
 
     print(f'\nTest Vector 1\n')
 
     #  test vector 1
-    run_tests(contract_instances, account, w3, 100, 50, 10, True)
-
-def createKey():
-    # Generate a key 
-    key = generate_aes_key()
-
-    write_aes_key("../poa_net/key.txt", key)
+    run_tests(contract_instances, account, w3, 100, 50, 10, True, 8)
 
 def main():
     print("Running tests...")
     contract_instances, account, w3 = setup()
-    # Create key for onboard and offboard
-    createKey()
+    
     # Run the tests
     runTestVectors(contract_instances, account, w3)
 
