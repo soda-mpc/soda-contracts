@@ -1,5 +1,3 @@
-import os
-import sys
 from eth_account import Account
 
 account = Account.create()

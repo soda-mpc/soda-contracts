@@ -50,7 +50,7 @@ class SodaWeb3Helper:
     
     def deploy_contract(self, 
                         contract_id, 
-                        gas_limit=1500000, 
+                        gas_limit=10000000, 
                         gas_price=DEFAULT_GAS_PRICE, 
                         chain_id=DEFAULT_CHAIN_ID, 
                         constructor_args=[],
@@ -99,6 +99,24 @@ class SodaWeb3Helper:
         
         func_to_call = getattr(self.contracts[contract_id].functions, func_name)
         transaction = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, func_args, account)
+        
+        return self._sign_and_send_transaction(transaction, account)
+
+    def call_contract_function_transaction(self, 
+                                  contract_id, 
+                                  func, 
+                                  gas_limit=2000000, 
+                                  gas_price=DEFAULT_GAS_PRICE, 
+                                  chain_id=DEFAULT_CHAIN_ID, 
+                                  account=None):
+        if account is None:
+            account = self.account
+        
+        if contract_id not in self.contracts:
+            print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
+            return None
+        
+        transaction = self._build_function_transaction(func, gas_limit, gas_price, chain_id, account)
         
         return self._sign_and_send_transaction(transaction, account)
     
@@ -152,6 +170,18 @@ class SodaWeb3Helper:
 
         print(f'Build transaction with args: {tx_args}')
         return func(*tx_args).build_transaction({
+            'from': account.address,
+            'chainId': chain_id,
+            'nonce': self.web3.eth.get_transaction_count(account.address),
+            'gas': gas_limit,
+            'gasPrice': self.web3.to_wei(gas_price, 'gwei')
+        })  
+    
+    def _build_function_transaction(self, func, gas_limit, gas_price, chain_id, account=None):
+        if account is None:
+            account = self.account
+
+        return func.build_transaction({
             'from': account.address,
             'chainId': chain_id,
             'nonce': self.web3.eth.get_transaction_count(account.address),

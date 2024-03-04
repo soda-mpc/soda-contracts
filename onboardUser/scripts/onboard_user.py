@@ -35,7 +35,7 @@ def main():
     signedEK = sign(public_key, bytes.fromhex(signing_key[2:]))
 
     # Call the getUserKey function to get the encrypted AES key
-    soda_helper.call_contract_transaction("onboard_user", "getUserKey", func_args=[public_key, signedEK])
+    receipt = soda_helper.call_contract_transaction("onboard_user", "getUserKey", func_args=[public_key, signedEK])
     if receipt is None:
         print("Failed to call the transaction function")
         return
