@@ -220,7 +220,7 @@ def load_contract(file_path):
     with open(file_path, 'r') as file:
         return file.read()
 
-def compile_contract(file_path, mpc_inst_path="lib/solidity/MPCInst.sol", mpc_core_path="lib/solidity/MpcCore.sol"):
+def compile_contract(file_path, mpc_inst_path="lib/solidity/MpcInterface.sol", mpc_core_path="lib/solidity/MpcCore.sol"):
     if SOLC_VERSION not in get_installed_solc_versions():
         install_solc(SOLC_VERSION)
         
@@ -232,7 +232,7 @@ def compile_contract(file_path, mpc_inst_path="lib/solidity/MPCInst.sol", mpc_co
     compiled_sol = compile_standard({
         "language": "Solidity",
         "sources": {
-            "MPCInst.sol": {"urls": [mpc_inst_path]},
+            "MpcInterface.sol": {"urls": [mpc_inst_path]},
             "MpcCore.sol": {"urls": [mpc_core_path]},
             file_path: {"content": solidity_code},
         },

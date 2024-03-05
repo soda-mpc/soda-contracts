@@ -1,4 +1,4 @@
-from soda_web3_helper import SodaWeb3Helper, DEFAULT_GAS_PRICE, REMOTE_HTTP_PROVIDER_URL
+from lib.python.soda_web3_helper import SodaWeb3Helper, DEFAULT_GAS_PRICE, REMOTE_HTTP_PROVIDER_URL
 
 PRIVATE_KEY = "0x2e0834786285daccd064ca17f1654f67b4aef298acbb82cef9ec422fb4975622"
 RECEIVER_ADDRESS = "0xc41Ba88D12f4E1869E287a909aD3D535Ba1FDf80"
@@ -40,9 +40,10 @@ def transfer_transaction(soda_helper):
 def contract_example(soda_helper):
     # We set up the contract - this will compile the contract and extract the bytecode and ABI.
     # The contract is not deployed yet, rather the compiled contract is saved under it's id (string)
-    contract_path = "SimpleERC20Token.sol"  # this will change in the next PR where the contracts
+    contract_name = "SimpleERC20Token.sol"  # this will change in the next PR where the contracts
                                                # will be moved to a different directory.
-    success = soda_helper.setup_contract(contract_path, "Token")
+    contract_path = "lib/python/"
+    success = soda_helper.setup_contract(contract_path + contract_name, "Token")
     if not success:
         print("Failed to set up the contract")
         return

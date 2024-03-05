@@ -36,7 +36,7 @@ struct itUint64 {
 }
 
 
-import "./MPCInst.sol";
+import "./MpcInterface.sol";
 
 
 library MpcCore {

@@ -1,6 +1,6 @@
 import fs from 'fs';
-import { generateRSAKeyPair, decryptRSA, sign } from '../../tools/js/crypto.js';
-import {SodaWeb3Helper, LOCAL_PROVIDER_URL} from '../../lib/js/sodaWeb3Helper.mjs';
+import { generateRSAKeyPair, decryptRSA, sign } from '../../../tools/js/crypto.js';
+import {SodaWeb3Helper, LOCAL_PROVIDER_URL} from '../../../lib/js/sodaWeb3Helper.mjs';
 
 const FILE_NAME = 'GetUserKeyContract.sol';
 const FILE_PATH = 'onboardUser/contracts/';

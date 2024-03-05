@@ -1,6 +1,6 @@
 import fs from 'fs';
-import { block_size, decrypt, prepareIT, hexBase } from '../../tools/js/crypto.js';
-import {SodaWeb3Helper, LOCAL_PROVIDER_URL} from '../../lib/js/sodaWeb3Helper.mjs';
+import { block_size, decrypt, prepareIT, hexBase } from '../../../tools/js/crypto.js';
+import {SodaWeb3Helper, LOCAL_PROVIDER_URL} from '../../../lib/js/sodaWeb3Helper.mjs';
 
 const FILE_NAME = 'PrivateERC20Contract.sol';
 const FILE_PATH = 'examples/contracts/';
