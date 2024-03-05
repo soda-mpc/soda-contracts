@@ -33,7 +33,7 @@ def get_function_signature(function_abi):
     return f"{function_abi['name']}({input_types})"
 
 def execute_and_check_balance(soda_helper, account, contract, function, user_key, name, expected_balance):
-    receipt = soda_helper.call_contract_function_transaction("erc20", function)
+    receipt = soda_helper.call_contract_function_transaction("private_erc20", function)
     if receipt is None:
         print("Failed to call the transaction function")
     # Get my encrypted balance, decrypt it and check if it matches the expected value
@@ -62,16 +62,16 @@ def main():
     soda_helper = SodaWeb3Helper(private_key, LOCAL_PROVIDER_URL)
 
     # Compile the contract
-    success = soda_helper.setup_contract(FILE_PATH + FILE_NAME, "erc20")
+    success = soda_helper.setup_contract(FILE_PATH + FILE_NAME, "private_erc20")
     if not success:
         print("Failed to set up the contract")
 
     # Deploy the contract
-    receipt = soda_helper.deploy_contract("erc20", constructor_args=["Soda", "SOD", INITIAL_BALANCE])
+    receipt = soda_helper.deploy_contract("private_erc20", constructor_args=["Soda", "SOD", INITIAL_BALANCE])
     if receipt is None:
         print("Failed to deploy the contract")
 
-    contract = soda_helper.get_contract("erc20")
+    contract = soda_helper.get_contract("private_erc20")
     
 
     print("************* View functions *************")
@@ -135,7 +135,7 @@ def main():
     print("************* Approve ", plaintext_integer*10, " to my address *************")
     # Set allowance for this account
     function = contract.functions.approveClear(account.address, plaintext_integer*10)
-    soda_helper.call_contract_function_transaction("erc20", function)
+    soda_helper.call_contract_function_transaction("private_erc20", function)
     # Get my allowance to check that the allowance is correct
     check_allowance(account, contract, user_key, plaintext_integer*10)
 
@@ -170,7 +170,7 @@ def main():
     # Prepare the input text for the function
     ct, signature = prepare_IT(50, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]))
     function = contract.functions.approve(account.address, ct, signature)
-    soda_helper.call_contract_function_transaction("erc20", function)
+    soda_helper.call_contract_function_transaction("private_erc20", function)
 
     print("************* Check my allowance *************")
     # Check that the allowance has changed to 50 SOD

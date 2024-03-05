@@ -1,109 +1,10 @@
 import fs from 'fs';
 import { block_size, decrypt, prepareIT, hexBase } from '../../tools/js/crypto.js';
-import solc from 'solc';
-import Web3 from 'web3';
+import {SodaWeb3Helper, LOCAL_PROVIDER_URL} from '../../lib/js/sodaWeb3Helper.mjs';
 
-const SOLC_VERSION = '0.8.19';
 const FILE_NAME = 'PrivateERC20Contract.sol';
-const FILE_PATH = '../contracts/';
-const PROVIDER_URL = 'http://localhost:7000';
+const FILE_PATH = 'examples/contracts/';
 const INITIAL_BALANCE = 500000000
-
-function checkInstalledSolcVersion(solcVersion) {
-    const installedVersion = solc.version();
-    console.log('Installed Solc version:', installedVersion);
-    if (!installedVersion.includes(solcVersion)) {
-        throw new Error(`Solc version ${solcVersion} is not installed. Please install it.`);
-    } else {
-        console.log(`Solc version ${solcVersion} is already installed.`);
-    }
-}
-
-function readSolidityCode(filePath) {
-    if (!fs.existsSync(filePath)) {
-        throw new Error(`The file ${filePath} does not exist`);
-    }
-    return fs.readFileSync(filePath, 'utf8');
-}
-
-function compileSolidity(solcVersion, filePath, solidityCode, mpcInstPath, mpcCorePath) {
-    const input = {
-        language: 'Solidity',
-        sources: {
-            'MPCInst.sol': { content: fs.readFileSync(mpcInstPath, 'utf8') },
-            'MpcCore.sol': { content: fs.readFileSync(mpcCorePath, 'utf8') },
-            [filePath]: { content: solidityCode },
-        },
-        settings: {
-            outputSelection: {
-                '*': {
-                    '*': ['abi', 'metadata', 'evm.bytecode', 'evm.bytecode.sourceMap'],
-                },
-            },
-        },
-    };
-    const output = JSON.parse(solc.compile(JSON.stringify(input)));
-    return output.contracts[filePath][filePath.split('.')[0]];
-}
-
-async function deployContract(web3, account, contractABI, contractBytecode, gas_limit=10000000, gas_price='30'){
-    const contract = new web3.eth.Contract(contractABI);
-    const deployTx = contract.deploy({
-        data: contractBytecode,
-        arguments: ["Soda", "SOD", INITIAL_BALANCE]
-    });
-    const deployOptions = {
-        data: deployTx.encodeABI(),
-        gas: gas_limit,
-        from: account.address,
-        gasPrice: web3.utils.toWei(gas_price.toString(), 'gwei') // Convert gas price to wei
-    };
-
-    try {
-        const signedTx = await web3.eth.accounts.signTransaction(deployOptions, account.privateKey);
-        const txHash = await new Promise((resolve, reject) => {
-            web3.eth.sendSignedTransaction(signedTx.rawTransaction)
-                .once('receipt', receipt => resolve(receipt.transactionHash))
-                .once('error', reject);
-        });
-    
-        const receipt = await web3.eth.getTransactionReceipt(txHash);
-        console.log('Contract deployed at:', receipt.contractAddress);
-    
-        // Access the deployed contract instance using new keyword
-        const deployedContract = new web3.eth.Contract(contractABI, receipt.contractAddress);
-        
-        // Access the deployed contract's address
-        console.log('Deployed contract address:', deployedContract.options.address);
-    
-        return deployedContract;
-        // return new web3.eth.Contract(contractABI, receipt.contractAddress);
-    } catch (error) {
-        console.error('Error deploying contract:', error);
-        throw error;
-    }
-    
-}
-
-async function executeTransaction(web3, account, func, gas_limit=10000000, gas_price='30') {
-    try {
-        const nonce = await web3.eth.getTransactionCount(account.address);
-        const transaction = await func.send({
-            from: account.address,
-            chainId: 50505050,
-            gas: gas_limit,
-            gasPrice: web3.utils.toWei(gas_price, 'gwei'),
-            nonce: nonce,
-        });
-
-        const txnReceipt = await web3.eth.getTransactionReceipt(transaction.transactionHash);
-        console.log(`Transaction successful with hash: ${txnReceipt.transactionHash}`);
-        return txnReceipt;
-    } catch (error) {
-        console.error('Error executing transaction:', error);
-        throw error;
-    }
-}
 
 function checkExpectedResult(name, expectedResult, result) {
     if (result === expectedResult) {
@@ -140,10 +41,10 @@ function decryptValue(myCTBalance, userKey) {
     return decryptedBalance;
 }
 
-async function executeAndCheckBalance(web3, account, func, contract, user_key, expectedBalance){
-    await executeTransaction(web3, account, func);
+async function executeAndCheckBalance(sodaHelper, func, contract, user_key, expectedBalance){
+    await sodaHelper.callContractFunctionTransaction(func);
     // Get my encrypted balance, decrypt it and check if it is equal to the expected balance
-    const my_CTBalance = await contract.methods.balanceOf().call({'from': account.address});
+    const my_CTBalance = await sodaHelper.callContractView("private_erc20", "balanceOf")
     const my_balance = decryptValue(my_CTBalance, user_key);
     checkExpectedResult('transfer', expectedBalance, my_balance);
 }
@@ -156,48 +57,51 @@ async function checkAllowance(account, contract, user_key, expectedAllowance){
 }
 
 async function main() {
-    checkInstalledSolcVersion(SOLC_VERSION);
-    const solidityCode = readSolidityCode(FILE_PATH + FILE_NAME);
-    
-    const mpcInstPath = '../../lib/solidity/MPCInst.sol';
-    const mpcCorePath = '../../lib/solidity/MpcCore.sol';
-    const compiledContract = compileSolidity(SOLC_VERSION, FILE_NAME, solidityCode, mpcInstPath, mpcCorePath);
-
-    const web3 = new Web3(new Web3.providers.HttpProvider(PROVIDER_URL));
-    if (!web3.eth.net.isListening()) {
-        console.log("Failed to connect to the Ethereum node.");
-        return;
-    }
+    // Get the private key from the environment variable
     const SIGNING_KEY = process.env.SIGNING_KEY;
-    web3.eth.accounts.wallet.add(SIGNING_KEY);
-    const account = web3.eth.accounts.wallet[0];
+    // Create helper function using the private key
+    const sodaHelper = new SodaWeb3Helper(SIGNING_KEY, LOCAL_PROVIDER_URL);
 
-    let contract = web3.eth.Contract 
-    contract = await deployContract(web3, account, compiledContract.abi, compiledContract.evm.bytecode.object);
-    
+    // compile the onboard solidity contract
+    const success = sodaHelper.setupContract(FILE_PATH, FILE_NAME, "private_erc20");
+    if (!success){
+        console.log("Failed to set up the contract")
+        return
+    }
+
+    // Deploy the contract
+    let receipt = await sodaHelper.deployContract("private_erc20", ["Soda", "SOD", INITIAL_BALANCE]);
+    if (!receipt){
+        console.log("Failed to deploy the contract")
+        return
+    }
+
     console.log("************* View functions *************");
-    const contractName = await contract.methods.name().call({'from': account.address});
+    const contractName = await sodaHelper.callContractView("private_erc20", "name")
     console.log("Function call result name:", contractName);
 
-    const symbol = await contract.methods.symbol().call({'from': account.address});
+    const symbol = await sodaHelper.callContractView("private_erc20", "symbol")
     console.log("Function call result symbol:", symbol);
 
-    const decimals = await contract.methods.decimals().call({'from': account.address});
+    const decimals = await sodaHelper.callContractView("private_erc20", "decimals")
     console.log("Function call result decimals:", decimals);
 
-    const totalSupply = await contract.methods.totalSupply().call({'from': account.address});
+    const totalSupply = await sodaHelper.callContractView("private_erc20", "totalSupply")
     console.log("Function call result totalSupply:", totalSupply);
 
     const user_key_hex = process.env.USER_KEY;
     const user_key = Buffer.from(user_key_hex, 'hex');
 
     console.log("************* Initial balance = ", INITIAL_BALANCE, " *************");
-    let my_CTBalance = await contract.methods.balanceOf().call({'from': account.address});
+    let my_CTBalance = await sodaHelper.callContractView("private_erc20", "balanceOf")
     let my_balance = decryptValue(my_CTBalance, user_key);
     checkExpectedResult('balanceOf', INITIAL_BALANCE, my_balance);
 
     // Generate a new account for Alice
-    const alice_address = web3.eth.accounts.create();
+    const alice_address = sodaHelper.generateRandomAccount();
+
+    const contract = sodaHelper.getContract("private_erc20")
+    const account = sodaHelper.getAccount();
 
     const plaintext_integer = 5;
 
@@ -205,12 +109,12 @@ async function main() {
     console.log("************* Transfer clear ", plaintext_integer, " to Alice *************");
     // Transfer 5 SOD to Alice
     let func = contract.methods.transfer(alice_address.address, plaintext_integer, true);
-    await executeAndCheckBalance(web3, account, func, contract, user_key, INITIAL_BALANCE - plaintext_integer)
+    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - plaintext_integer)
 
     console.log("************* Transfer clear ", plaintext_integer, " to Alice *************");
     // Transfer 5 SOD to Alice
     func = contract.methods.contractTransferClear(alice_address.address, plaintext_integer);
-    await executeAndCheckBalance(web3, account, func, contract, user_key, INITIAL_BALANCE - 2*plaintext_integer)
+    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - 2*plaintext_integer)
 
     console.log("************* Transfer IT ", plaintext_integer, " to Alice *************")
     // In order to generate the input text, we need to use some data of the function. 
@@ -226,30 +130,30 @@ async function main() {
     // Create the real function using the prepared IT
     func = contract.methods.transfer(alice_address.address, ctInt, signature, false);
     // Transfer 5 SOD to Alice
-    await executeAndCheckBalance(web3, account, func, contract, user_key, INITIAL_BALANCE - 3*plaintext_integer)
+    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - 3*plaintext_integer)
 
     console.log("************* Transfer clear ", plaintext_integer, " from my account to Alice without allowance *************")
     // Trying to transfer 5 SOD to Alice. There is no allowance, transfer should fail
     func = contract.methods.transferFrom(account.address, alice_address.address, plaintext_integer, true)
     // There is no allowance, balance should remain the same
-    await executeAndCheckBalance(web3, account, func, contract, user_key, INITIAL_BALANCE - 3*plaintext_integer)
+    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - 3*plaintext_integer)
 
     console.log("************* Approve ", plaintext_integer*10, " to my address *************")
     // Set allowance for this account
     func = contract.methods.approveClear(account.address, plaintext_integer*10)
-    await executeTransaction(web3, account, func)
+    await sodaHelper.callContractFunctionTransaction(func);
     // Get my allowance to check that the allowance is correct
     checkAllowance(account, contract, user_key, plaintext_integer*10)
 
     console.log("************* Transfer clear ", plaintext_integer, " from my account to Alice *************")
     // Transfer 5 SOD to Alice
     func = contract.methods.transferFrom(account.address, alice_address.address, plaintext_integer, true)
-    await executeAndCheckBalance(web3, account, func, contract, user_key, INITIAL_BALANCE - 4*plaintext_integer)
+    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - 4*plaintext_integer)
 
     console.log("************* Transfer clear ", plaintext_integer, " from my account to Alice *************")
     // Transfer 5 SOD to Alice
     func = contract.methods.contractTransferFromClear(account.address, alice_address.address, plaintext_integer)
-    await executeAndCheckBalance(web3, account, func, contract, user_key, INITIAL_BALANCE - 5*plaintext_integer)
+    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - 5*plaintext_integer)
 
     console.log("************* Transfer IT ", plaintext_integer, " from my account to Alice *************");
     // Transfer 5 SOD to Alice
@@ -258,7 +162,7 @@ async function main() {
     ({ctInt, signature} = prepareIT(plaintext_integer, user_key, account.address, contract.options.address, hashFuncSig, Buffer.from(SIGNING_KEY.slice(2), 'hex')));
     // Create the real function using the prepared IT output
     func = contract.methods.transferFrom(account.address, alice_address.address, ctInt, signature, false);
-    await executeAndCheckBalance(web3, account, func, contract, user_key, INITIAL_BALANCE - 6*plaintext_integer);
+    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - 6*plaintext_integer);
     
     console.log("************* Check my allowance *************")
     // Check the remainning allowance
@@ -270,7 +174,7 @@ async function main() {
     hashFuncSig = getFunctionSignature(func);
     ({ctInt, signature} = prepareIT(50, user_key, account.address, contract.options.address, hashFuncSig, Buffer.from(SIGNING_KEY.slice(2), 'hex')));
     func = contract.methods.approve(account.address, ctInt, signature);
-    await executeTransaction(web3, account, func);
+    await sodaHelper.callContractFunctionTransaction(func);
 
     console.log("************* Check my allowance *************")
     // Check that the allowance has changed to 50 SOD

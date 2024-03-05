@@ -21,8 +21,8 @@ class SodaWeb3Helper:
         self.web3.eth.default_account = self.account.address
         self.web3.middleware_onion.inject(geth_poa_middleware, layer=0) 
         if not self.web3.is_connected():
-            raise Exception("Failed to connect to the Ethereum node.")
-        print(f'Connected to the Ethereum node at {http_provider_url}')
+            raise Exception("Failed to connect to the node.")
+        print(f'Connected to the node at {http_provider_url}')
         
         self.contracts = {}
         print('SodaWeb3Helper initialized')

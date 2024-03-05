@@ -2,7 +2,8 @@ import os
 from tools.python.crypto import generate_rsa_keypair, decrypt_rsa, sign
 from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL
 
-FILE_PATH = 'GetUserKeyContract.sol'
+FILE_NAME = 'GetUserKeyContract.sol'
+FILE_PATH = 'onboardUser/contracts/'
 
 def main():
 
@@ -12,7 +13,7 @@ def main():
     soda_helper = SodaWeb3Helper(signing_key, LOCAL_PROVIDER_URL)
 
     # Compile the contract
-    success = soda_helper.setup_contract("onboardUser/contracts/" + FILE_PATH, "onboard_user")
+    success = soda_helper.setup_contract(FILE_PATH + FILE_NAME, "onboard_user")
     if not success:
         print("Failed to set up the contract")
 
