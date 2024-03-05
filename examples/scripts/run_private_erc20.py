@@ -1,9 +1,10 @@
 import os
 from eth_account import Account
-from tools.python.crypto import decrypt, prepare_IT
+from tools.python.crypto import decrypt, prepare_IT, block_size
 from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL
 
-FILE_PATH = 'PrivateERC20Contract.sol'
+FILE_NAME = 'PrivateERC20Contract.sol'
+FILE_PATH = 'examples/contracts/'
 INITIAL_BALANCE = 500000000
 
 def decrypt_value(my_CTBalance, user_key):
@@ -12,8 +13,8 @@ def decrypt_value(my_CTBalance, user_key):
     byte_array = my_CTBalance.to_bytes(32, byteorder='big')
 
     # Split ct into two 128-bit arrays r and cipher
-    cipher = byte_array[:16]
-    r = byte_array[16:]
+    cipher = byte_array[:block_size]
+    r = byte_array[block_size:]
 
     # Decrypt the cipher
     decrypted_message = decrypt(user_key, r, cipher)
@@ -61,7 +62,7 @@ def main():
     soda_helper = SodaWeb3Helper(private_key, LOCAL_PROVIDER_URL)
 
     # Compile the contract
-    success = soda_helper.setup_contract("examples/contracts/" + FILE_PATH, "erc20")
+    success = soda_helper.setup_contract(FILE_PATH + FILE_NAME, "erc20")
     if not success:
         print("Failed to set up the contract")
 
@@ -113,7 +114,7 @@ def main():
     print("************* Transfer IT ", plaintext_integer, " to Alice *************")
     # In order to generate the input text, we need to use some data of the function. 
     # For example, the address of the user, the address of the contract and also the function signature.
-    # In order to get the function signature as simple as possible, we decided to use a dummy function with dummy inputs and use it to generate the signature.
+    # To simplify the process of obtaining the function signature, we use a dummy function with placeholder inputs.
     # After the signature is generated, we call prepare input text function and get the input text to use in the real function.
     dummyCT = 0
     dummySignature = bytes(65)

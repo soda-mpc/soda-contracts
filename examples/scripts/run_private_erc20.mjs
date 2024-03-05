@@ -4,7 +4,8 @@ import solc from 'solc';
 import Web3 from 'web3';
 
 const SOLC_VERSION = '0.8.19';
-const FILE_PATH = 'PrivateERC20Contract.sol';
+const FILE_NAME = 'PrivateERC20Contract.sol';
+const FILE_PATH = '../contracts/';
 const PROVIDER_URL = 'http://localhost:7000';
 const INITIAL_BALANCE = 500000000
 
@@ -156,11 +157,11 @@ async function checkAllowance(account, contract, user_key, expectedAllowance){
 
 async function main() {
     checkInstalledSolcVersion(SOLC_VERSION);
-    const solidityCode = readSolidityCode("../contracts/" + FILE_PATH);
+    const solidityCode = readSolidityCode(FILE_PATH + FILE_NAME);
     
     const mpcInstPath = '../../lib/solidity/MPCInst.sol';
     const mpcCorePath = '../../lib/solidity/MpcCore.sol';
-    const compiledContract = compileSolidity(SOLC_VERSION, FILE_PATH, solidityCode, mpcInstPath, mpcCorePath);
+    const compiledContract = compileSolidity(SOLC_VERSION, FILE_NAME, solidityCode, mpcInstPath, mpcCorePath);
 
     const web3 = new Web3(new Web3.providers.HttpProvider(PROVIDER_URL));
     if (!web3.eth.net.isListening()) {
@@ -214,7 +215,7 @@ async function main() {
     console.log("************* Transfer IT ", plaintext_integer, " to Alice *************")
     // In order to generate the input text, we need to use some data of the function. 
     // For example, the address of the user, the address of the contract and also the function signature.
-    // In order to get the function signature as simple as possible, we decided to use a dummy function with dummy inputs and use it to generate the signature.
+    // To simplify the process of obtaining the function signature, we use a dummy function with placeholder inputs.
     // After the signature is generated, we call prepare input text function and get the input text to use in the real function.
     const dummyCT = 0;
     const dummySignature = Buffer.alloc(65);
