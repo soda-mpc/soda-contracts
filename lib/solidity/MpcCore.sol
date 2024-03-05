@@ -103,6 +103,10 @@ library MpcCore {
             SetPublic(bytes1(uint8(MPC_TYPE.SBOOL_T)), temp));
     }
 
+    function rand() internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).Rand(bytes1(uint8(MPC_TYPE.SBOOL_T))));
+    }
+
     function and(gtBool a, gtBool b) internal returns (gtBool) {
          return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             And(combineEnumsToBytes3(MPC_TYPE.SBOOL_T, MPC_TYPE.SBOOL_T, ARGS.BOTH_SECRET), gtBool.unwrap(a), gtBool.unwrap(b)));
@@ -171,6 +175,14 @@ library MpcCore {
     function setPublic8(uint8 pt) internal returns (gtUint8) {
           return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             SetPublic(bytes1(uint8(MPC_TYPE.SUINT8_T)), uint256(pt)));
+    }
+
+    function rand8() internal returns (gtUint8) {
+        return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).Rand(bytes1(uint8(MPC_TYPE.SUINT8_T))));
+    }
+
+    function randBoundedBits8(uint8 numBits) internal returns (gtUint8) {
+        return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).RandBoundedBits(bytes1(uint8(MPC_TYPE.SUINT8_T)), numBits));
     }
 
     function add(gtUint8 a, gtUint8 b) internal returns (gtUint8) {
@@ -307,6 +319,14 @@ library MpcCore {
             SetPublic(bytes1(uint8(MPC_TYPE.SUINT16_T)), uint256(pt)));
     }
 
+    function rand16() internal returns (gtUint16) {
+        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).Rand(bytes1(uint8(MPC_TYPE.SUINT16_T))));
+    }
+
+    function randBoundedBits16(uint8 numBits) internal returns (gtUint16) {
+        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).RandBoundedBits(bytes1(uint8(MPC_TYPE.SUINT16_T)), numBits));
+    }
+
     function add(gtUint16 a, gtUint16 b) internal returns (gtUint16) {
         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Add(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint16.unwrap(b)));
@@ -441,6 +461,14 @@ library MpcCore {
             SetPublic(bytes1(uint8(MPC_TYPE.SUINT32_T)), uint256(pt)));
     }
 
+    function rand32() internal returns (gtUint32) {
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).Rand(bytes1(uint8(MPC_TYPE.SUINT32_T))));
+    }
+
+    function randBoundedBits32(uint8 numBits) internal returns (gtUint32) {
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).RandBoundedBits(bytes1(uint8(MPC_TYPE.SUINT32_T)), numBits));
+    }
+
     function add(gtUint32 a, gtUint32 b) internal returns (gtUint32) {
         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Add(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint32.unwrap(b)));
@@ -573,6 +601,14 @@ library MpcCore {
     function setPublic64(uint64 pt) internal returns (gtUint64) {
           return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             SetPublic(bytes1(uint8(MPC_TYPE.SUINT64_T)), uint256(pt)));
+    }
+
+    function rand64() internal returns (gtUint64) {
+        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).Rand(bytes1(uint8(MPC_TYPE.SUINT64_T))));
+    }
+
+    function randBoundedBits64(uint8 numBits) internal returns (gtUint64) {
+        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).RandBoundedBits(bytes1(uint8(MPC_TYPE.SUINT64_T)), numBits));
     }
 
     function add(gtUint64 a, gtUint64 b) internal returns (gtUint64) {

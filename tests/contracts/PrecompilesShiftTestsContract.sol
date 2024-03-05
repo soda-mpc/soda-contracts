@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./MpcCore.sol";
+import "MpcCore.sol";
 
 contract PrecompilesShiftTestsContract {
 

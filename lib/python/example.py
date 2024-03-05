@@ -40,7 +40,7 @@ def transfer_transaction(soda_helper):
 def contract_example(soda_helper):
     # We set up the contract - this will compile the contract and extract the bytecode and ABI.
     # The contract is not deployed yet, rather the compiled contract is saved under it's id (string)
-    contract_path = "../SimpleERC20Token.sol"  # this will change in the next PR where the contracts
+    contract_path = "SimpleERC20Token.sol"  # this will change in the next PR where the contracts
                                                # will be moved to a different directory.
     success = soda_helper.setup_contract(contract_path, "Token")
     if not success:
