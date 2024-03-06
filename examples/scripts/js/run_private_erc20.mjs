@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { block_size, decrypt, prepareIT, hexBase } from '../../../tools/js/crypto.js';
-import {SodaWeb3Helper, LOCAL_PROVIDER_URL} from '../../../lib/js/sodaWeb3Helper.mjs';
+import {SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL} from '../../../lib/js/sodaWeb3Helper.mjs';
 
 const FILE_NAME = 'PrivateERC20Contract.sol';
 const FILE_PATH = 'examples/contracts/';
@@ -60,7 +60,7 @@ async function main() {
     // Get the private key from the environment variable
     const SIGNING_KEY = process.env.SIGNING_KEY;
     // Create helper function using the private key
-    const sodaHelper = new SodaWeb3Helper(SIGNING_KEY, LOCAL_PROVIDER_URL);
+    const sodaHelper = new SodaWeb3Helper(SIGNING_KEY, REMOTE_HTTP_PROVIDER_URL);
 
     // compile the onboard solidity contract
     const success = sodaHelper.setupContract(FILE_PATH, FILE_NAME, "private_erc20");

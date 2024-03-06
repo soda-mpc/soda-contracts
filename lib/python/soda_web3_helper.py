@@ -9,6 +9,7 @@ LOCAL_PROVIDER_URL = 'http://localhost:7000'
 REMOTE_HTTP_PROVIDER_URL = 'http://node.sodalabs.net:7000' 
 SOLC_VERSION = '0.8.19'
 DEFAULT_GAS_PRICE = '30'
+DEFAULT_GAS_LIMIT = 10000000
 DEFAULT_CHAIN_ID = 50505050
 
 class SodaWeb3Helper:
@@ -53,7 +54,7 @@ class SodaWeb3Helper:
     
     def deploy_contract(self, 
                         contract_id, 
-                        gas_limit=10000000, 
+                        gas_limit=DEFAULT_GAS_LIMIT, 
                         gas_price=DEFAULT_GAS_PRICE, 
                         chain_id=DEFAULT_CHAIN_ID, 
                         constructor_args=[],
@@ -85,7 +86,7 @@ class SodaWeb3Helper:
     def call_contract_transaction(self, 
                                   contract_id, 
                                   func_name, 
-                                  gas_limit=4000000, 
+                                  gas_limit=DEFAULT_GAS_LIMIT, 
                                   gas_price=DEFAULT_GAS_PRICE, 
                                   chain_id=DEFAULT_CHAIN_ID, 
                                   func_args=[], 
@@ -105,7 +106,7 @@ class SodaWeb3Helper:
     def call_contract_function_transaction(self, 
                                   contract_id, 
                                   func, 
-                                  gas_limit=2000000, 
+                                  gas_limit=DEFAULT_GAS_LIMIT, 
                                   gas_price=DEFAULT_GAS_PRICE, 
                                   chain_id=DEFAULT_CHAIN_ID, 
                                   account=None):

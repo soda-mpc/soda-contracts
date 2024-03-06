@@ -1,7 +1,7 @@
 import os
 from eth_account import Account
 from tools.python.crypto import decrypt, prepare_IT, block_size
-from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL
+from lib.python.soda_web3_helper import SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL
 
 FILE_NAME = 'PrivateERC20Contract.sol'
 FILE_PATH = 'examples/contracts/'
@@ -59,7 +59,7 @@ def main():
     account = Account.from_key(private_key)
     print(f'Signing key is {private_key}')
 
-    soda_helper = SodaWeb3Helper(private_key, LOCAL_PROVIDER_URL)
+    soda_helper = SodaWeb3Helper(private_key, REMOTE_HTTP_PROVIDER_URL)
 
     # Compile the contract
     success = soda_helper.setup_contract(FILE_PATH + FILE_NAME, "private_erc20")

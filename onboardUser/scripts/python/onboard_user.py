@@ -1,6 +1,6 @@
 import os
 from tools.python.crypto import generate_rsa_keypair, decrypt_rsa, sign
-from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL
+from lib.python.soda_web3_helper import SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL
 
 FILE_NAME = 'GetUserKeyContract.sol'
 FILE_PATH = 'onboardUser/contracts/'
@@ -10,7 +10,7 @@ def main():
     signing_key = os.environ.get('SIGNING_KEY')
     print(f'Signing key is {signing_key}')
 
-    soda_helper = SodaWeb3Helper(signing_key, LOCAL_PROVIDER_URL)
+    soda_helper = SodaWeb3Helper(signing_key, REMOTE_HTTP_PROVIDER_URL)
 
     # Compile the contract
     success = soda_helper.setup_contract(FILE_PATH + FILE_NAME, "onboard_user")

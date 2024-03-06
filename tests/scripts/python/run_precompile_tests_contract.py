@@ -1,7 +1,6 @@
 import os
 from tools.python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, decrypt_rsa, encrypt_rsa, sign, decrypt
-from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL
-
+from lib.python.soda_web3_helper import SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL
 # Path to the Solidity files
 SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol', 
                   'PrecompilesBitwiseTestsContract.sol', 
@@ -19,7 +18,7 @@ def setup():
     signing_key = os.environ.get('SIGNING_KEY')
     print(f'Signing key is {signing_key}')
 
-    soda_helper = SodaWeb3Helper(signing_key, LOCAL_PROVIDER_URL)
+    soda_helper = SodaWeb3Helper(signing_key, REMOTE_HTTP_PROVIDER_URL)
 
     # Compile the contracts
     for file_name in SOLIDITY_FILES:
