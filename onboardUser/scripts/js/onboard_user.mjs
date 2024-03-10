@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { generateRSAKeyPair, decryptRSA, sign } from '../../../tools/js/crypto.js';
+import { generateRSAKeyPair, decryptRSA, sign } from '../../../soda-sdk/js/crypto.js';
 import {SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL} from '../../../lib/js/sodaWeb3Helper.mjs';
 
 const FILE_NAME = 'GetUserKeyContract.sol';

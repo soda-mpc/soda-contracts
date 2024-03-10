@@ -1,5 +1,7 @@
 import os
-from tools.python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, decrypt_rsa, encrypt_rsa, sign, decrypt
+import sys
+sys.path.append('soda-sdk')
+from python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, decrypt_rsa, encrypt_rsa, sign, decrypt
 from lib.python.soda_web3_helper import SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL
 # Path to the Solidity files
 SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol', 

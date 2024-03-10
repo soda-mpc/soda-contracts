@@ -1,5 +1,7 @@
 import os
-from tools.python.crypto import generate_rsa_keypair, decrypt_rsa, sign
+import sys
+sys.path.append('soda-sdk')
+from python.crypto import generate_rsa_keypair, decrypt_rsa, sign
 from lib.python.soda_web3_helper import SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL
 
 FILE_NAME = 'GetUserKeyContract.sol'

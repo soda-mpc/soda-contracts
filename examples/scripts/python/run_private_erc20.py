@@ -1,6 +1,8 @@
 import os
 from eth_account import Account
-from tools.python.crypto import decrypt, prepare_IT, block_size
+import sys
+sys.path.append('soda-sdk')
+from python.crypto import decrypt, prepare_IT, block_size
 from lib.python.soda_web3_helper import SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL
 
 FILE_NAME = 'PrivateERC20Contract.sol'

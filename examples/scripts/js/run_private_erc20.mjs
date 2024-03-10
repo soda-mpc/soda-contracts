@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { block_size, decrypt, prepareIT, hexBase } from '../../../tools/js/crypto.js';
+import { block_size, decrypt, prepareIT, hexBase } from '../../../soda-sdk/js/crypto.js';
 import {SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL} from '../../../lib/js/sodaWeb3Helper.mjs';
 
 const FILE_NAME = 'PrivateERC20Contract.sol';
