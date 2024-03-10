@@ -65,7 +65,7 @@ This step involves creating a new user account within the system. The user accou
 
 This step generates a new private key and account.
 
-* Script: The system provides a script (gen_account) written in both Python and JavaScript to facilitate the generation of user accounts.
+* Script: The script named gen_account, available in both Python and JavaScript, is provided to facilitate the generation of user accounts.
 
 * Execution: To execute the script, navigate to the main directory (Devnet) and run the appropriate command depending on the language choice:
 
@@ -91,12 +91,12 @@ This step generates a new private key and account.
 
 This step involves acquiring native coins or tokens that are required to interact with the system. The system provides a Telegram-built faucet for users to request tokens easily through simple commands and interactions within the Telegram chat interface.
 
-* Faucet Interaction: Users can initiate a conversation with the system's bot and follow the prompts to receive tokens effortlessly.
+* Faucet Interaction: Users can initiate a conversation with the system's bot and follow the prompts to receive tokens.
 
 ### 3. Onboard the account to the system
 Once the account is created and funded with native coins, it needs to be onboarded to the system to obtain an AES key. This AES key may be used for encryption and decryption purposes within the system.
 
-* Script: The system provides a script (onboard_user) to facilitate the onboarding process.
+* Script: The script named onboard_user, available in both Python and JavaScript, is provided to facilitate the the onboarding process.
 
 * Execution: Similar to step 1, navigate to the main directory (Devnet) and run the appropriate command depending on the language choice:
 
@@ -133,7 +133,7 @@ It aims to ensure the confidentiality of token transactions through encryption t
 * Encrypted Balances and Allowances:
     Token balances and allowances are stored in encrypted form within the contract's state variables. This ensures that sensitive information remains confidential and inaccessible to unauthorized parties.
 * Integration with MPC Core:
-    The contract leverages functionalities provided by an external component called MpcCore. This component likely implements cryptographic operations such as encryption, decryption, and signature verification using techniques like Multi-Party Computation (MPC).
+    The contract leverages functionalities provided by an external component called MpcCore. This component implements cryptographic operations such as encryption, decryption, and signature verification using techniques like Multi-Party Computation (MPC).
 * Token Transfer Methods:
     The contract provides multiple transfer methods, allowing token transfers in both encrypted and clear (unencrypted) forms. Transfers can occur between addresses with encrypted token values or clear token values.
 * Approval Mechanism:
@@ -141,7 +141,7 @@ It aims to ensure the confidentiality of token transactions through encryption t
 
 ### Usage 
 
-* Script: The system provides a script (run_private_erc20) to run the example in both Python and JavaScript languages. 
+* Script: The script named run_private_erc20, available in both Python and JavaScript, is provided to run the example. 
 The run_private_erc20 script is designed to demonstrate the functionality of ERC20 tokens within the system. It includes functionalities such as transferring tokens, approving token transactions, and checking token balances.
 
 * Execution: Navigate to the main directory (Devnet) and run the appropriate command depending on the language choice:
