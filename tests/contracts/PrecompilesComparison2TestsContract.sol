@@ -40,12 +40,7 @@ contract PrecompilesComparison2TestsContract {
         gtBool res64_32;
     }
 
-    AllGTCastingValues private castingValues;
-    Check16 private check16;
-    Check32 private check32;
-    Check64 private check64;
-
-    function setPublicValues(uint8 a, uint8 b) public{
+    function setPublicValues(AllGTCastingValues memory castingValues, uint8 a, uint8 b) public{
         castingValues.a8_s = MpcCore.setPublic8(a);
         castingValues.b8_s = MpcCore.setPublic8(b);
         castingValues.a16_s =  MpcCore.setPublic16(a);
@@ -62,7 +57,7 @@ contract PrecompilesComparison2TestsContract {
         return result;
     }
 
-    function decryptAndCompareResults16() public returns (bool){
+    function decryptAndCompareResults16(Check16 memory check16) public returns (bool){
 
         // Calculate the result
         bool result = MpcCore.decrypt(check16.res16_16);
@@ -73,7 +68,7 @@ contract PrecompilesComparison2TestsContract {
         return result;
     }
 
-    function decryptAndCompareResults32() public returns (bool){
+    function decryptAndCompareResults32(Check32 memory check32) public returns (bool){
 
         // Calculate the result
         bool result = MpcCore.decrypt(check32.res32_32);
@@ -85,7 +80,7 @@ contract PrecompilesComparison2TestsContract {
         return result;
     }
 
-    function decryptAndCompareResults64() public returns (bool){
+    function decryptAndCompareResults64(Check64 memory check64) public returns (bool){
 
         // Calculate the result
         bool result = MpcCore.decrypt(check64.res64_64);
@@ -99,7 +94,11 @@ contract PrecompilesComparison2TestsContract {
     }
 
     function eqTest(uint8 a, uint8 b) public returns (bool) {
-        setPublicValues(a, b);
+        AllGTCastingValues memory castingValues;
+        Check16 memory check16;
+        Check32 memory check32;
+        Check64 memory check64;
+        setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
         result =  MpcCore.decrypt(MpcCore.eq(castingValues.a8_s, castingValues.b8_s));
@@ -108,7 +107,7 @@ contract PrecompilesComparison2TestsContract {
         check16.res16_16 = MpcCore.eq(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.eq(castingValues.a8_s, castingValues.b16_s);
         check16.res16_8 = MpcCore.eq(castingValues.a16_s, castingValues.b8_s);
-        bool res16 = decryptAndCompareResults16();
+        bool res16 = decryptAndCompareResults16(check16);
         require(res16 == result, "eqTest: cast 16 failed");
 
         // Calculate the result with casting to 32
@@ -117,7 +116,7 @@ contract PrecompilesComparison2TestsContract {
         check32.res32_8 = MpcCore.eq(castingValues.a32_s, castingValues.b8_s);
         check32.res16_32 = MpcCore.eq(castingValues.a16_s, castingValues.b32_s);
         check32.res32_16 = MpcCore.eq(castingValues.a32_s, castingValues.b16_s);
-        bool res32 = decryptAndCompareResults32();
+        bool res32 = decryptAndCompareResults32(check32);
         require(result == res32, "eqTest: cast 32 failed");
 
         // Calculate the result with casting to 64
@@ -128,7 +127,7 @@ contract PrecompilesComparison2TestsContract {
         check64.res64_16 = MpcCore.eq(castingValues.a64_s, castingValues.b16_s);
         check64.res32_64 = MpcCore.eq(castingValues.a32_s, castingValues.b64_s);
         check64.res64_32 = MpcCore.eq(castingValues.a64_s, castingValues.b32_s);
-        bool res64 = decryptAndCompareResults64();
+        bool res64 = decryptAndCompareResults64(check64);
         require(result == res64, "eqTest: cast 64 failed");
 
         // Check the result with scalar
@@ -145,7 +144,11 @@ contract PrecompilesComparison2TestsContract {
     }
 
     function neTest(uint8 a, uint8 b) public returns (bool) {
-        setPublicValues(a, b);
+        AllGTCastingValues memory castingValues;
+        Check16 memory check16;
+        Check32 memory check32;
+        Check64 memory check64;
+        setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
         result =  MpcCore.decrypt(MpcCore.ne(castingValues.a8_s, castingValues.b8_s));
@@ -154,7 +157,7 @@ contract PrecompilesComparison2TestsContract {
         check16.res16_16 = MpcCore.ne(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.ne(castingValues.a8_s, castingValues.b16_s);
         check16.res16_8 = MpcCore.ne(castingValues.a16_s, castingValues.b8_s);
-        bool res16 = decryptAndCompareResults16();
+        bool res16 = decryptAndCompareResults16(check16);
         require(res16 == result, "neTest: cast 16 failed");
 
         // Calculate the result with casting to 32
@@ -163,7 +166,7 @@ contract PrecompilesComparison2TestsContract {
         check32.res32_8 = MpcCore.ne(castingValues.a32_s, castingValues.b8_s);
         check32.res16_32 = MpcCore.ne(castingValues.a16_s, castingValues.b32_s);
         check32.res32_16 = MpcCore.ne(castingValues.a32_s, castingValues.b16_s);
-        bool res32 = decryptAndCompareResults32();
+        bool res32 = decryptAndCompareResults32(check32);
         require(result == res32, "neTest: cast 32 failed");
 
         // Calculate the result with casting to 64
@@ -174,7 +177,7 @@ contract PrecompilesComparison2TestsContract {
         check64.res64_16 = MpcCore.ne(castingValues.a64_s, castingValues.b16_s);
         check64.res32_64 = MpcCore.ne(castingValues.a32_s, castingValues.b64_s);
         check64.res64_32 = MpcCore.ne(castingValues.a64_s, castingValues.b32_s);
-        bool res64 = decryptAndCompareResults64();
+        bool res64 = decryptAndCompareResults64(check64);
         require(result == res64, "neTest: cast 64 failed");
 
         // Check the result with scalar
@@ -191,7 +194,11 @@ contract PrecompilesComparison2TestsContract {
     }
 
     function geTest(uint8 a, uint8 b) public returns (bool) {
-        setPublicValues(a, b);
+        AllGTCastingValues memory castingValues;
+        Check16 memory check16;
+        Check32 memory check32;
+        Check64 memory check64;
+        setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
         result =  MpcCore.decrypt(MpcCore.ge(castingValues.a8_s, castingValues.b8_s));
@@ -200,7 +207,7 @@ contract PrecompilesComparison2TestsContract {
         check16.res16_16 = MpcCore.ge(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.ge(castingValues.a8_s, castingValues.b16_s);
         check16.res16_8 = MpcCore.ge(castingValues.a16_s, castingValues.b8_s);
-        bool res16 = decryptAndCompareResults16();
+        bool res16 = decryptAndCompareResults16(check16);
         require(res16 == result, "geTest: cast 16 failed");
 
         // Calculate the result with casting to 32
@@ -209,7 +216,7 @@ contract PrecompilesComparison2TestsContract {
         check32.res32_8 = MpcCore.ge(castingValues.a32_s, castingValues.b8_s);
         check32.res16_32 = MpcCore.ge(castingValues.a16_s, castingValues.b32_s);
         check32.res32_16 = MpcCore.ge(castingValues.a32_s, castingValues.b16_s);
-        bool res32 = decryptAndCompareResults32();
+        bool res32 = decryptAndCompareResults32(check32);
         require(result == res32, "geTest: cast 32 failed");
 
         // Calculate the result with casting to 64
@@ -220,7 +227,7 @@ contract PrecompilesComparison2TestsContract {
         check64.res64_16 = MpcCore.ge(castingValues.a64_s, castingValues.b16_s);
         check64.res32_64 = MpcCore.ge(castingValues.a32_s, castingValues.b64_s);
         check64.res64_32 = MpcCore.ge(castingValues.a64_s, castingValues.b32_s);
-        bool res64 = decryptAndCompareResults64();
+        bool res64 = decryptAndCompareResults64(check64);
         require(result == res64, "geTest: cast 64 failed");
 
         // Check the result with scalar

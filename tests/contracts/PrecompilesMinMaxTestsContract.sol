@@ -40,12 +40,7 @@ contract PrecompilesMinMaxTestsContract {
         gtUint64 res64_32;
     }
 
-    AllGTCastingValues private castingValues;
-    Check16 private check16;
-    Check32 private check32;
-    Check64 private check64;
-
-    function setPublicValues(uint8 a, uint8 b) public{
+    function setPublicValues(AllGTCastingValues memory castingValues, uint8 a, uint8 b) public{
         castingValues.a8_s = MpcCore.setPublic8(a);
         castingValues.b8_s = MpcCore.setPublic8(b);
         castingValues.a16_s =  MpcCore.setPublic16(a);
@@ -62,7 +57,7 @@ contract PrecompilesMinMaxTestsContract {
         return result;
     }
 
-    function decryptAndCompareResults16() public returns (uint16){
+    function decryptAndCompareResults16(Check16 memory check16) public returns (uint16){
 
         // Calculate the result
         uint16 result = MpcCore.decrypt(check16.res16_16);
@@ -73,7 +68,7 @@ contract PrecompilesMinMaxTestsContract {
         return result;
     }
 
-    function decryptAndCompareResults32() public returns (uint32){
+    function decryptAndCompareResults32(Check32 memory check32) public returns (uint32){
 
         // Calculate the result
         uint32 result = MpcCore.decrypt(check32.res32_32);
@@ -85,7 +80,7 @@ contract PrecompilesMinMaxTestsContract {
         return result;
     }
 
-    function decryptAndCompareResults64() public returns (uint64){
+    function decryptAndCompareResults64(Check64 memory check64) public returns (uint64){
 
         // Calculate the result
         uint64 result = MpcCore.decrypt(check64.res64_64);
@@ -99,7 +94,11 @@ contract PrecompilesMinMaxTestsContract {
     }
 
     function minTest(uint8 a, uint8 b) public returns (uint8) {
-        setPublicValues(a, b);
+        AllGTCastingValues memory castingValues;
+        Check16 memory check16;
+        Check32 memory check32;
+        Check64 memory check64;
+        setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
         result =  MpcCore.decrypt(MpcCore.min(castingValues.a8_s, castingValues.b8_s));
@@ -108,7 +107,7 @@ contract PrecompilesMinMaxTestsContract {
         check16.res16_16 = MpcCore.min(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.min(castingValues.a8_s, castingValues.b16_s);
         check16.res16_8 = MpcCore.min(castingValues.a16_s, castingValues.b8_s);
-        uint16 res16 = decryptAndCompareResults16();
+        uint16 res16 = decryptAndCompareResults16(check16);
         require(res16 == result, "minTest: cast 16 failed");
 
         // Calculate the result with casting to 32
@@ -117,7 +116,7 @@ contract PrecompilesMinMaxTestsContract {
         check32.res32_8 = MpcCore.min(castingValues.a32_s, castingValues.b8_s);
         check32.res16_32 = MpcCore.min(castingValues.a16_s, castingValues.b32_s);
         check32.res32_16 = MpcCore.min(castingValues.a32_s, castingValues.b16_s);
-        uint32 res32 = decryptAndCompareResults32();
+        uint32 res32 = decryptAndCompareResults32(check32);
         require(result == res32, "minTest: cast 32 failed");
 
         // Calculate the result with casting to 64
@@ -128,7 +127,7 @@ contract PrecompilesMinMaxTestsContract {
         check64.res64_16 = MpcCore.min(castingValues.a64_s, castingValues.b16_s);
         check64.res32_64 = MpcCore.min(castingValues.a32_s, castingValues.b64_s);
         check64.res64_32 = MpcCore.min(castingValues.a64_s, castingValues.b32_s);
-        uint64 res64 = decryptAndCompareResults64();
+        uint64 res64 = decryptAndCompareResults64(check64);
         require(result == res64, "minTest: cast 64 failed");
 
         // Check the result with scalar
@@ -145,7 +144,11 @@ contract PrecompilesMinMaxTestsContract {
     }
 
     function maxTest(uint8 a, uint8 b) public returns (uint8) {
-        setPublicValues(a, b);
+        AllGTCastingValues memory castingValues;
+        Check16 memory check16;
+        Check32 memory check32;
+        Check64 memory check64;
+        setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
         result =  MpcCore.decrypt(MpcCore.max(castingValues.a8_s, castingValues.b8_s));
@@ -154,7 +157,7 @@ contract PrecompilesMinMaxTestsContract {
         check16.res16_16 = MpcCore.max(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.max(castingValues.a8_s, castingValues.b16_s);
         check16.res16_8 = MpcCore.max(castingValues.a16_s, castingValues.b8_s);
-        uint16 res16 = decryptAndCompareResults16();
+        uint16 res16 = decryptAndCompareResults16(check16);
         require(res16 == result, "maxTest: cast 16 failed");
 
         // Calculate the result with casting to 32
@@ -163,7 +166,7 @@ contract PrecompilesMinMaxTestsContract {
         check32.res32_8 = MpcCore.max(castingValues.a32_s, castingValues.b8_s);
         check32.res16_32 = MpcCore.max(castingValues.a16_s, castingValues.b32_s);
         check32.res32_16 = MpcCore.max(castingValues.a32_s, castingValues.b16_s);
-        uint32 res32 = decryptAndCompareResults32();
+        uint32 res32 = decryptAndCompareResults32(check32);
         require(result == res32, "maxTest: cast 32 failed");
 
         // Calculate the result with casting to 64
@@ -174,7 +177,7 @@ contract PrecompilesMinMaxTestsContract {
         check64.res64_16 = MpcCore.max(castingValues.a64_s, castingValues.b16_s);
         check64.res32_64 = MpcCore.max(castingValues.a32_s, castingValues.b64_s);
         check64.res64_32 = MpcCore.max(castingValues.a64_s, castingValues.b32_s);
-        uint64 res64 = decryptAndCompareResults64();
+        uint64 res64 = decryptAndCompareResults64(check64);
         require(result == res64, "maxTest: cast 64 failed");
 
         // Check the result with scalar

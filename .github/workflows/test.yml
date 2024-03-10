@@ -1,0 +1,82 @@
+name: Test
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup SSH Key for soda-sdk
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SDK }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          # Start the SSH agent and add the key
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Update soda-sdk submodule
+        run: |
+          git submodule update --init soda-sdk 
+          git submodule update --remote soda-sdk # get the latest commit
+
+      - name: Install requirements
+        run: |
+          pip install -r requirements.txt
+          npm install
+          # cd onboardUser/scripts/js
+          # npm install
+          # cd ../../../soda-sdk/js
+          # npm install
+          cd lib/js
+          npm install
+
+      - name: Onboard user - js
+        run: |
+          chmod +x onboardUser/scripts/js/gen_account.mjs
+          node onboardUser/scripts/js/gen_account.mjs
+          source .env
+          python -m onboardUser.scripts.python.transfer_native_coins ${{ secrets.SECRET_KEY }}
+          chmod +x onboardUser/scripts/js/onboard_user.mjs
+          node onboardUser/scripts/js/onboard_user.mjs
+    
+      - name: Run js ERC20
+        run: |
+          source .env
+          node examples/scripts/js/run_private_erc20.mjs
+
+      - name: Onboard user - python
+        run: |
+          rm .env
+          chmod +x onboardUser/scripts/python/gen_account.py
+          python -m onboardUser.scripts.python.gen_account
+          source .env
+          python -m onboardUser.scripts.python.transfer_native_coins ${{ secrets.SECRET_KEY }}
+          chmod +x onboardUser/scripts/python/onboard_user.py
+          python -m onboardUser.scripts.python.onboard_user
+
+      - name: Run tests
+        run: |
+          source .env
+          python -m tests.scripts.python.run_precompile_tests_contract
+
+      - name: Run python ERC20
+        run: |
+          source .env
+          python -m examples.scripts.python.run_private_erc20
+  
+      - name: Check Exit Codes
+        run: |
+          if [ ${{ job.status }} == "success" ]; then
+            echo "All processes exited with exit code 0."
+          else
+            echo "One or more processes did not exit with exit code 0."
+          fi

@@ -10,7 +10,6 @@ FILE_PATH = 'onboardUser/contracts/'
 def main():
 
     signing_key = os.environ.get('SIGNING_KEY')
-    print(f'Signing key is {signing_key}')
 
     soda_helper = SodaWeb3Helper(signing_key, REMOTE_HTTP_PROVIDER_URL)
 
@@ -40,9 +39,7 @@ def main():
     
     # Decrypt the aes key using the RSA private key
     decrypted_aes_key = decrypt_rsa(private_key, encryptedKey)
-    # Print the aes key
-    print("user AES key:", decrypted_aes_key.hex())
-
+    
     # Write the data to a .env file
     with open('.env', 'a') as f:
         f.write(f"export USER_KEY='{decrypted_aes_key.hex()}'\n")

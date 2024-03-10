@@ -40,18 +40,13 @@ contract PrecompilesBitwiseTestsContract {
         gtUint64 res64_32;
     }
 
-    AllGTCastingValues private castingValues;
-    Check16 private check16;
-    Check32 private check32;
-    Check64 private check64;
-
     uint8 result;
 
     function getResult() public view returns (uint8) {
         return result;
     }
 
-    function setPublicValues(uint8 a, uint8 b) public{
+    function setPublicValues(AllGTCastingValues memory castingValues, uint8 a, uint8 b) public{
         castingValues.a8_s = MpcCore.setPublic8(a);
         castingValues.b8_s = MpcCore.setPublic8(b);
         castingValues.a16_s =  MpcCore.setPublic16(a);
@@ -62,7 +57,7 @@ contract PrecompilesBitwiseTestsContract {
         castingValues.b64_s =  MpcCore.setPublic64(b);
     }
 
-    function decryptAndCompareResults16() public returns (uint16){
+    function decryptAndCompareResults16(Check16 memory check16) public returns (uint16){
 
         // Calculate the result
         uint16 result = MpcCore.decrypt(check16.res16_16);
@@ -73,7 +68,7 @@ contract PrecompilesBitwiseTestsContract {
         return result;
     }
 
-    function decryptAndCompareResults32() public returns (uint32){
+    function decryptAndCompareResults32(Check32 memory check32) public returns (uint32){
 
         // Calculate the result
         uint32 result = MpcCore.decrypt(check32.res32_32);
@@ -85,7 +80,7 @@ contract PrecompilesBitwiseTestsContract {
         return result;
     }
 
-    function decryptAndCompareResults64() public returns (uint64){
+    function decryptAndCompareResults64(Check64 memory check64) public returns (uint64){
 
         // Calculate the result
         uint64 result = MpcCore.decrypt(check64.res64_64);
@@ -99,7 +94,11 @@ contract PrecompilesBitwiseTestsContract {
     }
 
     function andTest(uint8 a, uint8 b) public returns (uint8) {
-        setPublicValues(a, b);
+        AllGTCastingValues memory castingValues;
+        Check16 memory check16;
+        Check32 memory check32;
+        Check64 memory check64;
+        setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
         result =  MpcCore.decrypt(MpcCore.and(castingValues.a8_s, castingValues.b8_s));
@@ -108,7 +107,7 @@ contract PrecompilesBitwiseTestsContract {
         check16.res16_16 = MpcCore.and(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.and(castingValues.a8_s, castingValues.b16_s);
         check16.res16_8 = MpcCore.and(castingValues.a16_s, castingValues.b8_s);
-        uint16 res16 = decryptAndCompareResults16();
+        uint16 res16 = decryptAndCompareResults16(check16);
         require(res16 == result, "andTest: cast 16 failed");
 
         // Calculate the result with casting to 32
@@ -117,7 +116,7 @@ contract PrecompilesBitwiseTestsContract {
         check32.res32_8 = MpcCore.and(castingValues.a32_s, castingValues.b8_s);
         check32.res16_32 = MpcCore.and(castingValues.a16_s, castingValues.b32_s);
         check32.res32_16 = MpcCore.and(castingValues.a32_s, castingValues.b16_s);
-        uint32 res32 = decryptAndCompareResults32();
+        uint32 res32 = decryptAndCompareResults32(check32);
         require(result == res32, "andTest: cast 32 failed");
 
         // Calculate the result with casting to 64
@@ -128,7 +127,7 @@ contract PrecompilesBitwiseTestsContract {
         check64.res64_16 = MpcCore.and(castingValues.a64_s, castingValues.b16_s);
         check64.res32_64 = MpcCore.and(castingValues.a32_s, castingValues.b64_s);
         check64.res64_32 = MpcCore.and(castingValues.a64_s, castingValues.b32_s);
-        uint64 res64 = decryptAndCompareResults64();
+        uint64 res64 = decryptAndCompareResults64(check64);
         require(result == res64, "andTest: cast 64 failed");
 
         // Check the result with scalar
@@ -145,7 +144,11 @@ contract PrecompilesBitwiseTestsContract {
     }
 
     function orTest(uint8 a, uint8 b) public returns (uint8) {
-        setPublicValues(a, b);
+        AllGTCastingValues memory castingValues;
+        Check16 memory check16;
+        Check32 memory check32;
+        Check64 memory check64;
+        setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
         result =  MpcCore.decrypt(MpcCore.or(castingValues.a8_s, castingValues.b8_s));
@@ -154,7 +157,7 @@ contract PrecompilesBitwiseTestsContract {
         check16.res16_16 = MpcCore.or(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.or(castingValues.a8_s, castingValues.b16_s);
         check16.res16_8 = MpcCore.or(castingValues.a16_s, castingValues.b8_s);
-        uint16 res16 = decryptAndCompareResults16();
+        uint16 res16 = decryptAndCompareResults16(check16);
         require(res16 == result, "orTest: cast 16 failed");
 
         // Calculate the result with casting to 32
@@ -163,7 +166,7 @@ contract PrecompilesBitwiseTestsContract {
         check32.res32_8 = MpcCore.or(castingValues.a32_s, castingValues.b8_s);
         check32.res16_32 = MpcCore.or(castingValues.a16_s, castingValues.b32_s);
         check32.res32_16 = MpcCore.or(castingValues.a32_s, castingValues.b16_s);
-        uint32 res32 = decryptAndCompareResults32();
+        uint32 res32 = decryptAndCompareResults32(check32);
         require(result == res32, "orTest: cast 32 failed");
 
         // Calculate the result with casting to 64
@@ -174,7 +177,7 @@ contract PrecompilesBitwiseTestsContract {
         check64.res64_16 = MpcCore.or(castingValues.a64_s, castingValues.b16_s);
         check64.res32_64 = MpcCore.or(castingValues.a32_s, castingValues.b64_s);
         check64.res64_32 = MpcCore.or(castingValues.a64_s, castingValues.b32_s);
-        uint64 res64 = decryptAndCompareResults64();
+        uint64 res64 = decryptAndCompareResults64(check64);
         require(result == res64, "orTest: cast 64 failed");
 
         // Check the result with scalar
@@ -191,7 +194,11 @@ contract PrecompilesBitwiseTestsContract {
     }
 
     function xorTest(uint8 a, uint8 b) public returns (uint8) {
-        setPublicValues(a, b);
+        AllGTCastingValues memory castingValues;
+        Check16 memory check16;
+        Check32 memory check32;
+        Check64 memory check64;
+        setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
         result =  MpcCore.decrypt(MpcCore.xor(castingValues.a8_s, castingValues.b8_s));
@@ -200,7 +207,7 @@ contract PrecompilesBitwiseTestsContract {
         check16.res16_16 = MpcCore.xor(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.xor(castingValues.a8_s, castingValues.b16_s);
         check16.res16_8 = MpcCore.xor(castingValues.a16_s, castingValues.b8_s);
-        uint16 res16 = decryptAndCompareResults16();
+        uint16 res16 = decryptAndCompareResults16(check16);
         require(res16 == result, "xorTest: cast 16 failed");
 
         // Calculate the result with casting to 32
@@ -209,7 +216,7 @@ contract PrecompilesBitwiseTestsContract {
         check32.res32_8 = MpcCore.xor(castingValues.a32_s, castingValues.b8_s);
         check32.res16_32 = MpcCore.xor(castingValues.a16_s, castingValues.b32_s);
         check32.res32_16 = MpcCore.xor(castingValues.a32_s, castingValues.b16_s);
-        uint32 res32 = decryptAndCompareResults32();
+        uint32 res32 = decryptAndCompareResults32(check32);
         require(result == res32, "xorTest: cast 32 failed");
 
         // Calculate the result with casting to 64
@@ -220,7 +227,7 @@ contract PrecompilesBitwiseTestsContract {
         check64.res64_16 = MpcCore.xor(castingValues.a64_s, castingValues.b16_s);
         check64.res32_64 = MpcCore.xor(castingValues.a32_s, castingValues.b64_s);
         check64.res64_32 = MpcCore.xor(castingValues.a64_s, castingValues.b32_s);
-        uint64 res64 = decryptAndCompareResults64();
+        uint64 res64 = decryptAndCompareResults64(check64);
         require(result == res64, "xorTest: cast 64 failed");
 
         // Check the result with scalar

@@ -40,11 +40,6 @@ contract PrecompilesShiftTestsContract {
         gtUint64 res64_32;
     }
 
-    AllGTCastingValues private castingValues;
-    Check16 private check16;
-    Check32 private check32;
-    Check64 private check64;
-
     uint8 result;
     uint16 result16;
     uint32 result32;
@@ -58,7 +53,7 @@ contract PrecompilesShiftTestsContract {
         return (result, result16, result32, result64);
     }
 
-    function setPublicValues(uint8 a, uint8 b) public{
+    function setPublicValues(AllGTCastingValues memory castingValues, uint8 a, uint8 b) public{
         castingValues.a8_s = MpcCore.setPublic8(a);
         castingValues.b8_s = MpcCore.setPublic8(b);
         castingValues.a16_s =  MpcCore.setPublic16(a);
@@ -69,7 +64,7 @@ contract PrecompilesShiftTestsContract {
         castingValues.b64_s =  MpcCore.setPublic64(b);
     }
 
-    function decryptAndCompareResults16() public returns (uint16){
+    function decryptAndCompareResults16(Check16 memory check16) public returns (uint16){
 
         // Calculate the result
         uint16 result = MpcCore.decrypt(check16.res16_16);
@@ -80,7 +75,7 @@ contract PrecompilesShiftTestsContract {
         return result;
     }
 
-    function decryptAndCompareResults32() public returns (uint32){
+    function decryptAndCompareResults32(Check32 memory check32) public returns (uint32){
 
         // Calculate the result
         uint32 result = MpcCore.decrypt(check32.res32_32);
@@ -92,7 +87,7 @@ contract PrecompilesShiftTestsContract {
         return result;
     }
 
-    function decryptAndCompareResults64() public returns (uint64){
+    function decryptAndCompareResults64(Check64 memory check64) public returns (uint64){
 
         // Calculate the result
         uint64 result = MpcCore.decrypt(check64.res64_64);
@@ -106,7 +101,11 @@ contract PrecompilesShiftTestsContract {
     }
 
     function shlTest(uint8 a, uint8 b) public returns (uint8, uint16, uint32, uint64) {
-        setPublicValues(a, b);
+        AllGTCastingValues memory castingValues;
+        Check16 memory check16;
+        Check32 memory check32;
+        Check64 memory check64;
+        setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
         result =  MpcCore.decrypt(MpcCore.shl(castingValues.a8_s, castingValues.b8_s));
@@ -115,7 +114,7 @@ contract PrecompilesShiftTestsContract {
         check16.res16_16 = MpcCore.shl(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.shl(castingValues.a8_s, castingValues.b16_s);
         check16.res16_8 = MpcCore.shl(castingValues.a16_s, castingValues.b8_s);
-        result16 = decryptAndCompareResults16();
+        result16 = decryptAndCompareResults16(check16);
 
         // Calculate the result with casting to 32
         check32.res32_32 = MpcCore.shl(castingValues.a32_s, castingValues.b32_s);
@@ -123,7 +122,7 @@ contract PrecompilesShiftTestsContract {
         check32.res32_8 = MpcCore.shl(castingValues.a32_s, castingValues.b8_s);
         check32.res16_32 = MpcCore.shl(castingValues.a16_s, castingValues.b32_s);
         check32.res32_16 = MpcCore.shl(castingValues.a32_s, castingValues.b16_s);
-        result32 = decryptAndCompareResults32();
+        result32 = decryptAndCompareResults32(check32);
 
         // Calculate the result with casting to 64
         check64.res64_64 = MpcCore.shl(castingValues.a64_s, castingValues.b64_s);
@@ -133,7 +132,7 @@ contract PrecompilesShiftTestsContract {
         check64.res64_16 = MpcCore.shl(castingValues.a64_s, castingValues.b16_s);
         check64.res32_64 = MpcCore.shl(castingValues.a32_s, castingValues.b64_s);
         check64.res64_32 = MpcCore.shl(castingValues.a64_s, castingValues.b32_s);
-        result64 = decryptAndCompareResults64();
+        result64 = decryptAndCompareResults64(check64);
 
         // Check the result with scalar
         require(result == MpcCore.decrypt(MpcCore.shl(a, castingValues.b8_s)) && result == MpcCore.decrypt(MpcCore.shl(castingValues.a8_s, b)),
@@ -149,7 +148,11 @@ contract PrecompilesShiftTestsContract {
     } 
 
     function shrTest(uint8 a, uint8 b) public returns (uint8) {
-        setPublicValues(a, b);
+        AllGTCastingValues memory castingValues;
+        Check16 memory check16;
+        Check32 memory check32;
+        Check64 memory check64;
+        setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
         result =  MpcCore.decrypt(MpcCore.shr(castingValues.a8_s, castingValues.b8_s));
@@ -158,7 +161,7 @@ contract PrecompilesShiftTestsContract {
         check16.res16_16 = MpcCore.shr(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.shr(castingValues.a8_s, castingValues.b16_s);
         check16.res16_8 = MpcCore.shr(castingValues.a16_s, castingValues.b8_s);
-        uint16 res16 = decryptAndCompareResults16();
+        uint16 res16 = decryptAndCompareResults16(check16);
         require(res16 == result, "shrTest: cast 16 failed");
 
         // Calculate the result with casting to 32
@@ -167,7 +170,7 @@ contract PrecompilesShiftTestsContract {
         check32.res32_8 = MpcCore.shr(castingValues.a32_s, castingValues.b8_s);
         check32.res16_32 = MpcCore.shr(castingValues.a16_s, castingValues.b32_s);
         check32.res32_16 = MpcCore.shr(castingValues.a32_s, castingValues.b16_s);
-        uint32 res32 = decryptAndCompareResults32();
+        uint32 res32 = decryptAndCompareResults32(check32);
         require(result == res32, "shrTest: cast 32 failed");
 
         // Calculate the result with casting to 64
@@ -178,7 +181,7 @@ contract PrecompilesShiftTestsContract {
         check64.res64_16 = MpcCore.shr(castingValues.a64_s, castingValues.b16_s);
         check64.res32_64 = MpcCore.shr(castingValues.a32_s, castingValues.b64_s);
         check64.res64_32 = MpcCore.shr(castingValues.a64_s, castingValues.b32_s);
-        uint64 res64 = decryptAndCompareResults64();
+        uint64 res64 = decryptAndCompareResults64(check64);
         require(result == res64, "shrTest: cast 64 failed");
 
         // Check the result with scalar

@@ -6,7 +6,7 @@ from web3 import Web3
 from solcx import compile_standard, install_solc, get_installed_solc_versions
 
 LOCAL_PROVIDER_URL = 'http://localhost:7000'
-REMOTE_HTTP_PROVIDER_URL = 'http://node.sodalabs.net:7000' 
+REMOTE_HTTP_PROVIDER_URL = 'https://stress.sodalabs.net' 
 SOLC_VERSION = '0.8.19'
 DEFAULT_GAS_PRICE = '30'
 DEFAULT_GAS_LIMIT = 10000000
@@ -63,11 +63,11 @@ class SodaWeb3Helper:
         if account is None:
             account = self.account
         
-        print(f'Contract id: {contract_id}, Gas limit: {gas_limit}, Gas price: {gas_price}, Chain id: {chain_id}')
         func_to_call = self.contracts[contract_id].constructor
         construct_txn = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, constructor_args, account)
         receipt = self._sign_and_send_transaction(construct_txn, account)
         if receipt is not None:
+            print(f"Contract deployed at address: {receipt.contractAddress}")
             self.contracts[contract_id] = self.web3.eth.contract(
                 address=receipt.contractAddress, 
                 abi=self.contracts[contract_id].abi,

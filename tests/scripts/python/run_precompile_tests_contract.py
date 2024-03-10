@@ -18,7 +18,6 @@ SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol',
 
 def setup():
     signing_key = os.environ.get('SIGNING_KEY')
-    print(f'Signing key is {signing_key}')
 
     soda_helper = SodaWeb3Helper(signing_key, REMOTE_HTTP_PROVIDER_URL)
 

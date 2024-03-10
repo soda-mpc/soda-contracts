@@ -5,8 +5,6 @@ import {generateECDSAPrivateKey} from '../../../soda-sdk/js/crypto.js';
 // Generate ECDSA private key
 const privateKey = generateECDSAPrivateKey().toString('hex');
 
-console.log(`Private key: ${privateKey}`);
-
 // Create account address from private key
 const address = privateToAddress(Buffer.from(privateKey, 'hex')).toString('hex');
 

@@ -59,7 +59,6 @@ def main():
     # Get the account private key from the environment variable
     private_key = os.environ.get('SIGNING_KEY')
     account = Account.from_key(private_key)
-    print(f'Signing key is {private_key}')
 
     soda_helper = SodaWeb3Helper(private_key, REMOTE_HTTP_PROVIDER_URL)
 

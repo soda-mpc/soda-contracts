@@ -36,7 +36,6 @@ async function main() {
     // Decrypt the AES key using the RSA private key
     const buf = Buffer.from(encryptedKey.substring(2), 'hex');
     const decryptedAESKey = decryptRSA(privateKey, buf);
-    console.log("user AES key:", decryptedAESKey.toString('hex'));
 
     fs.appendFileSync('.env', `export USER_KEY='${decryptedAESKey.toString('hex')}'\n`);
 }
