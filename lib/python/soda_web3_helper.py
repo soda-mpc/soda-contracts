@@ -6,7 +6,7 @@ from web3 import Web3
 from solcx import compile_standard, install_solc, get_installed_solc_versions
 
 LOCAL_PROVIDER_URL = 'http://localhost:7000'
-REMOTE_HTTP_PROVIDER_URL = 'https://stress.sodalabs.net' 
+REMOTE_HTTP_PROVIDER_URL = 'https://node.sodalabs.net' 
 SOLC_VERSION = '0.8.19'
 DEFAULT_GAS_PRICE = '30'
 DEFAULT_GAS_LIMIT = 10000000
