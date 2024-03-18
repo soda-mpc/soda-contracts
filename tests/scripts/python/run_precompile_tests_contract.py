@@ -38,9 +38,7 @@ def execute_and_check_result(name, expected_result, soda_helper, contract, func_
     receipt = soda_helper.call_contract_transaction(contract, func_name, func_args=func_args)
     if receipt is None:
         print("Failed to call the transaction function")
-    # execute_transaction(soda_helper, contract, function)
     result = soda_helper.call_contract_view(contract, "getResult")
-    # result = contract.functions.getResult().call()
     check_expected_result(name, expected_result, result)
 
 def check_expected_result(name, expected_result, result):
@@ -184,8 +182,23 @@ def test_randomBoundedBits(soda_helper, contract, numBits):
     else:
         raise ValueError(f'Test RandomBoundedBits failed.')
 
+def test_boolean(soda_helper, contract, bool_a, bool_b, bit):
+    receipt = soda_helper.call_contract_transaction(contract, "booleanTest", func_args=[bool_a, bool_b, bit])
+    if receipt is None:
+        print("Failed to call the transaction function")
+    andRes, orRes, xorRes, notRes, eqRes, neqRes, muxRes, onboardRes = soda_helper.call_contract_view(contract, "getBooleanResults")
+    check_expected_result("boolean_and", bool_a and bool_b, andRes)
+    check_expected_result("boolean_or", bool_a or bool_b, orRes)
+    check_expected_result("boolean_xor", bool_a ^ bool_b, xorRes)
+    check_expected_result("boolean_not", not bool_a, notRes)
+    check_expected_result("boolean_equal", bool_a == bool_b, eqRes)
+    check_expected_result("boolean_notEqual", bool_a != bool_b, neqRes)
+    check_expected_result("boolean_mux", bool_b if bit else bool_a, muxRes)
+    check_expected_result("boolean_onboard_offboard", bool_a, onboardRes)
+
+
 # Main test function
-def run_tests(soda_helper, a, b, shift, bit, numBits):
+def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b):
     # Test Addition
     test_addition(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b, a + b)
     
@@ -264,18 +277,20 @@ def run_tests(soda_helper, a, b, shift, bit, numBits):
     # test random bounded bits
     test_randomBoundedBits(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', numBits)
 
+    test_boolean(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', bool_a, bool_b, bit)
+
 
 def runTestVectors(soda_helper):
 
     print(f'\nTest Vector 0\n')
 
     #  test vector 0
-    run_tests(soda_helper, 10, 5, 2, False, 7)
+    run_tests(soda_helper, 10, 5, 2, False, 7, True, False)
 
     print(f'\nTest Vector 1\n')
 
     #  test vector 1
-    run_tests(soda_helper, 100, 50, 10, True, 8)
+    run_tests(soda_helper, 100, 50, 10, True, 8, False, False)
 
 def main():
     print("Running tests...")

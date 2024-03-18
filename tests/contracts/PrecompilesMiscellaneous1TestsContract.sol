@@ -6,9 +6,21 @@ import "MpcCore.sol";
 contract PrecompilesMiscellaneous1TestsContract {
 
     uint64 random = 0;
+    bool andRes;
+    bool orRes;
+    bool xorRes;
+    bool notRes;
+    bool eqRes;
+    bool neqRes;
+    bool muxRes;
+    bool onboardRes;
 
     function getRandom() public view returns (uint64) {
         return random;
+    }
+
+    function getBooleanResults() public view returns (bool, bool, bool, bool, bool, bool, bool, bool) {
+        return (andRes, orRes, xorRes, notRes, eqRes, neqRes, muxRes, onboardRes);
     }
 
     uint constant MAX_SIZE_8_BITS = 10; 
@@ -119,6 +131,23 @@ contract PrecompilesMiscellaneous1TestsContract {
         checkNotAllEqual(randoms, size);
         
         return random; 
+    }
+
+    function booleanTest(bool a, bool b, bool bit) public {
+        gtBool aGT = MpcCore.setPublic(a);
+        gtBool bGT = MpcCore.setPublic(b);
+        gtBool bitGT = MpcCore.setPublic(bit);
+
+        andRes = MpcCore.decrypt(MpcCore.and(aGT, bGT));
+        orRes = MpcCore.decrypt(MpcCore.or(aGT, bGT));
+        xorRes = MpcCore.decrypt(MpcCore.xor(aGT, bGT));
+        notRes = MpcCore.decrypt(MpcCore.not(aGT));
+        eqRes = MpcCore.decrypt(MpcCore.eq(aGT, bGT));
+        neqRes = MpcCore.decrypt(MpcCore.ne(aGT, bGT));
+        muxRes = MpcCore.decrypt(MpcCore.mux(bitGT, aGT, bGT));
+
+        ctBool cipher = MpcCore.offBoard(aGT);
+        onboardRes = MpcCore.decrypt(MpcCore.onBoard(cipher)); 
     }
 
 }
