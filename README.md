@@ -10,6 +10,9 @@ installing all the necessary dependencies for getting started.
 # Clone the Repository
 ```bash
 git clone git@github.com:soda-mpc/devnet.git
+cd devnet
+git submodule update --init soda-sdk 
+git submodule update --remote soda-sdk
 ```
 
 # Installation Instructions
@@ -37,7 +40,6 @@ sudo apt install python3.9
 python3 -m virtualenv sodanet
 source sodanet/bin/activate
 pip install -r requirements.txt
-cd ..
 ```
 
 #### Install Javascript Dependencies
@@ -91,7 +93,12 @@ This step generates a new private key and account.
 
 This step involves acquiring native coins or tokens that are required to interact with the system. The system provides a Telegram-built faucet for users to request tokens easily through simple commands and interactions within the Telegram chat interface.
 
-* Faucet Interaction: Users can initiate a conversation with the system's bot and follow the prompts to receive tokens.
+* Faucet Interaction: Users can initiate a conversation with the telegram faucet handle [@SodaFaucet_bot](https://t.me/SodaFaucet_bot). 
+
+    In a DM with the bot, send:
+        
+    can I have some soda? &lt;an ethereum wallet address&gt;
+
 
 ### 3. Onboard the account to the system
 Once the account is created and funded with native coins, it needs to be onboarded to the system to obtain an AES key. This AES key may be used for encryption and decryption purposes within the system.
