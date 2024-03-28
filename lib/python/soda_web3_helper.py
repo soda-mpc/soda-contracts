@@ -153,7 +153,7 @@ class SodaWeb3Helper:
             'to': to_address,
             'value': self.web3.to_wei(amount, 'ether'),
             'gas': gas_limit,
-            'gasPrice': self.web3.to_wei(gas_price, 'gwei'),
+            'gasPrice': self.web3.to_wei(gas_price, 'wei'),
             'nonce': self.web3.eth.get_transaction_count(account.address),
             'chainId': chain_id
         }
@@ -174,7 +174,7 @@ class SodaWeb3Helper:
             'chainId': chain_id,
             'nonce': self.web3.eth.get_transaction_count(account.address),
             'gas': gas_limit,
-            'gasPrice': self.web3.to_wei(gas_price, 'gwei')
+            'gasPrice': self.web3.to_wei(gas_price, 'wei')
         })  
     
     def _build_function_transaction(self, func, gas_limit, gas_price, chain_id, account=None):
@@ -186,7 +186,7 @@ class SodaWeb3Helper:
             'chainId': chain_id,
             'nonce': self.web3.eth.get_transaction_count(account.address),
             'gas': gas_limit,
-            'gasPrice': self.web3.to_wei(gas_price, 'gwei')
+            'gasPrice': self.web3.to_wei(gas_price, 'wei')
         })  
     
     def _sign_and_send_transaction(self, transaction, account):
