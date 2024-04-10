@@ -32,7 +32,7 @@ interface ExtendedOperations {
     function Mux(bytes3 metaData, uint256 bit, uint256 a,uint256 b) external returns (uint256 result);
     function Not(bytes1 metaData, uint256 a) external returns (uint256 result);
     function Transfer(bytes4 metaData, uint256 a, uint256 b, uint256 amount) external returns (uint256 new_a, uint256 new_b, uint256 res);
-    function TransferWithAllowance(bytes4 metaData, uint256 a, uint256 b, uint256 amount, uint256 allowance) external returns (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance);
+    function TransferWithAllowance(bytes5 metaData, uint256 a, uint256 b, uint256 amount, uint256 allowance) external returns (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance);
     function ValidateCiphertext(bytes1 metaData, uint256 ciphertext, bytes calldata signature) external returns (uint256 result);
     function GetUserKey(bytes calldata signedEK) external view returns (bytes memory encryptedKey);
 }
