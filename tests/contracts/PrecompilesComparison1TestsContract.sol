@@ -40,10 +40,18 @@ contract PrecompilesComparison1TestsContract {
         gtBool res64_32;
     }
 
-    bool result;
+    bool gtResult;
+    bool leResult;
+    bool ltResult;
 
-    function getResult() public view returns (bool) {
-        return result;
+    function getGtResult() public view returns (bool) {
+        return gtResult;
+    }
+    function getLeResult() public view returns (bool) {
+        return leResult;
+    }
+    function getLtResult() public view returns (bool) {
+        return ltResult;
     }
 
     function setPublicValues(AllGTCastingValues memory castingValues, uint8 a, uint8 b) public{
@@ -101,7 +109,8 @@ contract PrecompilesComparison1TestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.gt(castingValues.a8_s, castingValues.b8_s));
+        bool result =  MpcCore.decrypt(MpcCore.gt(castingValues.a8_s, castingValues.b8_s));
+        gtResult = result;
     
         // Calculate the results with cating to 16
         check16.res16_16 = MpcCore.gt(castingValues.a16_s, castingValues.b16_s);
@@ -151,7 +160,8 @@ contract PrecompilesComparison1TestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.le(castingValues.a8_s, castingValues.b8_s));
+        bool result =  MpcCore.decrypt(MpcCore.le(castingValues.a8_s, castingValues.b8_s));
+        leResult = result;
     
         // Calculate the results with cating to 16
         check16.res16_16 = MpcCore.le(castingValues.a16_s, castingValues.b16_s);
@@ -201,8 +211,9 @@ contract PrecompilesComparison1TestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.lt(castingValues.a8_s, castingValues.b8_s));
-    
+        bool result =  MpcCore.decrypt(MpcCore.lt(castingValues.a8_s, castingValues.b8_s));
+        ltResult = result;
+
         // Calculate the results with cating to 16
         check16.res16_16 = MpcCore.lt(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.lt(castingValues.a8_s, castingValues.b16_s);

@@ -51,10 +51,20 @@ contract PrecompilesComparison2TestsContract {
         castingValues.b64_s =  MpcCore.setPublic64(b);
     }
 
-    bool result;
+    bool eqResult;
+    bool neResult;
+    bool geResult;
 
-    function getResult() public view returns (bool) {
-        return result;
+    function getEqResult() public view returns (bool) {
+        return eqResult;
+    }
+
+    function getNeResult() public view returns (bool) {
+        return neResult;
+    }
+
+    function getGeResult() public view returns (bool) {
+        return geResult;
     }
 
     function decryptAndCompareResults16(Check16 memory check16) public returns (bool){
@@ -101,8 +111,9 @@ contract PrecompilesComparison2TestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.eq(castingValues.a8_s, castingValues.b8_s));
-    
+        bool result =  MpcCore.decrypt(MpcCore.eq(castingValues.a8_s, castingValues.b8_s));
+        eqResult = result;
+
         // Calculate the results with casting to 16
         check16.res16_16 = MpcCore.eq(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.eq(castingValues.a8_s, castingValues.b16_s);
@@ -151,8 +162,9 @@ contract PrecompilesComparison2TestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.ne(castingValues.a8_s, castingValues.b8_s));
-    
+        bool result =  MpcCore.decrypt(MpcCore.ne(castingValues.a8_s, castingValues.b8_s));
+        neResult = result;
+
         // Calculate the results with casting to 16
         check16.res16_16 = MpcCore.ne(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.ne(castingValues.a8_s, castingValues.b16_s);
@@ -201,8 +213,9 @@ contract PrecompilesComparison2TestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.ge(castingValues.a8_s, castingValues.b8_s));
-    
+        bool result =  MpcCore.decrypt(MpcCore.ge(castingValues.a8_s, castingValues.b8_s));
+        geResult = result;
+
         // Calculate the results with casting to 16
         check16.res16_16 = MpcCore.ge(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.ge(castingValues.a8_s, castingValues.b16_s);

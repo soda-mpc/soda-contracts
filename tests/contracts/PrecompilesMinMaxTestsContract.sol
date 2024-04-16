@@ -51,10 +51,14 @@ contract PrecompilesMinMaxTestsContract {
         castingValues.b64_s =  MpcCore.setPublic64(b);
     }
 
-    uint8 result;
+    uint8 minResult;
+    uint8 maxResult;
 
-    function getResult() public view returns (uint8) {
-        return result;
+    function getMinResult() public view returns (uint8) {
+        return minResult;
+    }
+    function getMaxResult() public view returns (uint8) {
+        return maxResult;
     }
 
     function decryptAndCompareResults16(Check16 memory check16) public returns (uint16){
@@ -101,8 +105,9 @@ contract PrecompilesMinMaxTestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.min(castingValues.a8_s, castingValues.b8_s));
-    
+        uint8 result =  MpcCore.decrypt(MpcCore.min(castingValues.a8_s, castingValues.b8_s));
+        minResult = result;
+
         // Calculate the results with casting to 16
         check16.res16_16 = MpcCore.min(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.min(castingValues.a8_s, castingValues.b16_s);
@@ -151,8 +156,9 @@ contract PrecompilesMinMaxTestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.max(castingValues.a8_s, castingValues.b8_s));
-    
+        uint8 result =  MpcCore.decrypt(MpcCore.max(castingValues.a8_s, castingValues.b8_s));
+        maxResult = result;
+
         // Calculate the results with casting to 16
         check16.res16_16 = MpcCore.max(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.max(castingValues.a8_s, castingValues.b16_s);

@@ -51,11 +51,23 @@ contract PrecompilesMiscellaneousTestsContract {
         castingValues.b64_s =  MpcCore.setPublic64(b);
     }
 
-    uint8 result;
+    uint8 divResult;
+    uint8 remResult;
+    uint8 muxResult;
+    uint8 onboardOffboardResult;
     bool boolResult;
 
-    function getResult() public view returns (uint8) {
-        return result;
+    function getDivResult() public view returns (uint8) {
+        return divResult;
+    }
+    function getRemResult() public view returns (uint8) {
+        return remResult;
+    }
+    function getMuxResult() public view returns (uint8) {
+        return muxResult;
+    }
+    function getOnboardOffboardResult() public view returns (uint8) {
+        return onboardOffboardResult;
     }
 
     function getBoolResult() public view returns (bool) {
@@ -105,8 +117,9 @@ contract PrecompilesMiscellaneousTestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.div(castingValues.a8_s, castingValues.b8_s));
-    
+        uint8 result =  MpcCore.decrypt(MpcCore.div(castingValues.a8_s, castingValues.b8_s));
+        divResult = result;
+
         // Calculate the results with casting to 16
         check16.res16_16 = MpcCore.div(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.div(castingValues.a8_s, castingValues.b16_s);
@@ -155,8 +168,9 @@ contract PrecompilesMiscellaneousTestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.rem(castingValues.a8_s, castingValues.b8_s));
-    
+        uint8 result =  MpcCore.decrypt(MpcCore.rem(castingValues.a8_s, castingValues.b8_s));
+        remResult = result;
+
         // Calculate the results with casting to 16
         check16.res16_16 = MpcCore.rem(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.rem(castingValues.a8_s, castingValues.b16_s);
@@ -206,8 +220,9 @@ contract PrecompilesMiscellaneousTestsContract {
         gtBool selectionBit_s = MpcCore.setPublic(selectionBit);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.mux(selectionBit_s, castingValues.a8_s, castingValues.b8_s));
-    
+        uint8 result =  MpcCore.decrypt(MpcCore.mux(selectionBit_s, castingValues.a8_s, castingValues.b8_s));
+        muxResult = result;
+
         // Calculate the result with casting to 16
         check16.res16_16 = MpcCore.mux(selectionBit_s, castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.mux(selectionBit_s, castingValues.a8_s, castingValues.b16_s);
@@ -245,7 +260,8 @@ contract PrecompilesMiscellaneousTestsContract {
         gtUint64 a64_s = MpcCore.setPublic64(a64);
 
         ctUint8 cipher8 = MpcCore.offBoard(a8_s);
-        result = MpcCore.decrypt(MpcCore.onBoard(cipher8)); 
+        uint8 result = MpcCore.decrypt(MpcCore.onBoard(cipher8)); 
+        onboardOffboardResult = result;
 
         ctUint16 cipher16 = MpcCore.offBoard(a16_s);
         uint16 result16 = MpcCore.decrypt(MpcCore.onBoard(cipher16)); 

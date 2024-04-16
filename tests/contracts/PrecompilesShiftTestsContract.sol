@@ -41,6 +41,7 @@ contract PrecompilesShiftTestsContract {
     }
 
     uint8 result;
+    uint8 result8;
     uint16 result16;
     uint32 result32;
     uint64 result64;
@@ -50,7 +51,7 @@ contract PrecompilesShiftTestsContract {
     }
 
     function getAllShiftResults() public view returns (uint8, uint16, uint32, uint64) { 
-        return (result, result16, result32, result64);
+        return (result8, result16, result32, result64);
     }
 
     function setPublicValues(AllGTCastingValues memory castingValues, uint8 a, uint8 b) public{
@@ -108,8 +109,9 @@ contract PrecompilesShiftTestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.shl(castingValues.a8_s, castingValues.b8_s));
-    
+        uint8 result =  MpcCore.decrypt(MpcCore.shl(castingValues.a8_s, castingValues.b8_s));
+        result8 = result;
+
         // Calculate the result with casting to 16
         check16.res16_16 = MpcCore.shl(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.shl(castingValues.a8_s, castingValues.b16_s);
