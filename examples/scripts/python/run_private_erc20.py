@@ -34,12 +34,26 @@ def get_function_signature(function_abi):
     # Generate the function signature
     return f"{function_abi['name']}({input_types})"
 
+def get_encrypted_balance(soda_helper, account, contract):
+    function = contract.functions.balanceOf()
+    receipt = soda_helper.call_contract_function_transaction("private_erc20", function)
+    if receipt is None:
+        print("Failed to call the transaction function")
+    balance_events = contract.events.Balance().process_receipt(receipt)
+    # Filter events for the specific address
+    for event in balance_events:
+        if event['args']['_owner'].lower() == account.address.lower():
+            return event['args']['_balance']
+    
+    print("Failed to find balance of the account address in the transaction receipt.")
+    return None
+
 def execute_and_check_balance(soda_helper, account, contract, function, user_key, name, expected_balance):
     receipt = soda_helper.call_contract_function_transaction("private_erc20", function)
     if receipt is None:
         print("Failed to call the transaction function")
     # Get my encrypted balance, decrypt it and check if it matches the expected value
-    my_CTBalance = contract.functions.balanceOf().call({'from': account.address})
+    my_CTBalance = get_encrypted_balance(soda_helper, account, contract)
     my_balance = decrypt_value(my_CTBalance, user_key)
     check_expected_result(name, expected_balance, my_balance)
 
@@ -93,7 +107,7 @@ def main():
 
 
     print("************* Initial balance = ", INITIAL_BALANCE, " *************")
-    my_CTBalance = contract.functions.balanceOf().call({'from': account.address})
+    my_CTBalance = get_encrypted_balance(soda_helper, account, contract)
     my_balance = decrypt_value(my_CTBalance, user_key)
     check_expected_result('balanceOf', INITIAL_BALANCE, my_balance)
 
