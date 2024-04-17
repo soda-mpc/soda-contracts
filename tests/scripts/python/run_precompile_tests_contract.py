@@ -3,8 +3,7 @@ import sys
 from time import sleep
 sys.path.append('soda-sdk')
 from python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, decrypt_rsa, encrypt_rsa, sign, decrypt
-from lib.python.soda_web3_helper import SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL, LOCAL_PROVIDER_URL
-import argparse
+from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 
 # Path to the Solidity files
 SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol',
@@ -461,12 +460,6 @@ def main(provider_url: str):
     runTestVectors(soda_helper)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Get URL.')
-    parser.add_argument('provider_url', type=str, help='The node url')
-    args = parser.parse_args()
-    if args.provider_url == "Local":
-        main(LOCAL_PROVIDER_URL)
-    elif args.provider_url == "Remote":
-        main(REMOTE_HTTP_PROVIDER_URL)
-    else:
-        print("Invalid provider url")
+    url = parse_url_parameter()
+    if (url is not None):
+        main(url)
