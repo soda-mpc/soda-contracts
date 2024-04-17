@@ -3,7 +3,7 @@ from eth_account import Account
 import sys
 sys.path.append('soda-sdk')
 from python.crypto import decrypt, prepare_IT, block_size
-from lib.python.soda_web3_helper import SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL
+from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 
 FILE_NAME = 'PrivateERC20Contract.sol'
 FILE_PATH = 'examples/contracts/'
@@ -69,12 +69,12 @@ def check_expected_result(name, expected_result, result):
     else:
         raise ValueError(f'Test {name} failed. Expected: {expected_result}, Actual: {result}')
 
-def main():
+def main(provider_url: str):
     # Get the account private key from the environment variable
     private_key = os.environ.get('SIGNING_KEY')
     account = Account.from_key(private_key)
 
-    soda_helper = SodaWeb3Helper(private_key, REMOTE_HTTP_PROVIDER_URL)
+    soda_helper = SodaWeb3Helper(private_key, provider_url)
 
     # Compile the contract
     success = soda_helper.setup_contract(FILE_PATH + FILE_NAME, "private_erc20")
@@ -195,4 +195,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    url = parse_url_parameter()
+    if (url is not None):
+        main(url)

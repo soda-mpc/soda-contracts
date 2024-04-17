@@ -4,6 +4,7 @@ from web3.middleware import geth_poa_middleware
 from eth_account import Account
 from web3 import Web3
 from solcx import compile_standard, install_solc, get_installed_solc_versions
+import argparse
 
 LOCAL_PROVIDER_URL = 'http://localhost:7000'
 REMOTE_HTTP_PROVIDER_URL = 'https://node.sodalabs.net' 
@@ -11,6 +12,18 @@ SOLC_VERSION = '0.8.19'
 DEFAULT_GAS_PRICE = '30'
 DEFAULT_GAS_LIMIT = 10000000
 DEFAULT_CHAIN_ID = 50505050
+
+def parse_url_parameter():
+    parser = argparse.ArgumentParser(description='Get URL')
+    parser.add_argument('provider_url', type=str, help='The provider url')
+    args = parser.parse_args()
+    if args.provider_url == "Local":
+        return LOCAL_PROVIDER_URL
+    elif args.provider_url == "Remote":
+        return REMOTE_HTTP_PROVIDER_URL
+    else:
+        print("Invalid provider url")
+        return None
 
 class SodaWeb3Helper:
     def __init__(self, private_key_string, http_provider_url):

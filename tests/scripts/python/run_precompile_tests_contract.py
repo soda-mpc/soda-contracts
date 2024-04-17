@@ -2,7 +2,9 @@ import os
 import sys
 sys.path.append('soda-sdk')
 from python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, decrypt_rsa, encrypt_rsa, sign, decrypt
-from lib.python.soda_web3_helper import SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL
+from lib.python.soda_web3_helper import SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL, LOCAL_PROVIDER_URL
+import argparse
+
 # Path to the Solidity files
 SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol', 
                   'PrecompilesBitwiseTestsContract.sol', 
@@ -16,10 +18,10 @@ SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol',
                   'PrecompilesComparison1TestsContract.sol',
                   'PrecompilesOffboardToUserKeyTestContract.sol']
 
-def setup():
+def setup(provider_url: str):
     signing_key = os.environ.get('SIGNING_KEY')
 
-    soda_helper = SodaWeb3Helper(signing_key, REMOTE_HTTP_PROVIDER_URL)
+    soda_helper = SodaWeb3Helper(signing_key, provider_url)
 
     # Compile the contracts
     for file_name in SOLIDITY_FILES:
@@ -292,12 +294,20 @@ def runTestVectors(soda_helper):
     #  test vector 1
     run_tests(soda_helper, 100, 50, 10, True, 8, False, False)
 
-def main():
+def main(provider_url: str):
     print("Running tests...")
-    soda_helper = setup()
+    soda_helper = setup(provider_url)
     
     # Run the tests
     runTestVectors(soda_helper)
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='Get URL.')
+    parser.add_argument('provider_url', type=str, help='The node url')
+    args = parser.parse_args()
+    if args.provider_url == "Local":
+        main(LOCAL_PROVIDER_URL)
+    elif args.provider_url == "Remote":
+        main(REMOTE_HTTP_PROVIDER_URL)
+    else:
+        print("Invalid provider url")
