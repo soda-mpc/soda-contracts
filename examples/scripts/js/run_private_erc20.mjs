@@ -41,10 +41,33 @@ function decryptValue(myCTBalance, userKey) {
     return decryptedBalance;
 }
 
+async function getEncryptedBalance(sodaHelper, contract){
+    let func = contract.methods.balanceOf();
+    const receipt = await sodaHelper.callContractFunctionTransaction(func);
+
+    // Processing the receipt to extract Balance events
+    const balanceEvents = await contract.getPastEvents('Balance', {
+        fromBlock: receipt.blockNumber,
+        toBlock: receipt.blockNumber
+    });
+
+    // Filter events for the specific address
+    const targetEvent = balanceEvents.find(event => 
+        event.returnValues._owner.toLowerCase() === sodaHelper.getAccount().address.toLowerCase()
+    );
+
+    if (targetEvent) {
+        return targetEvent.returnValues._balance;
+    } else {
+        console.log("Failed to find balance of the account address in the transaction receipt.");
+        return null;
+    }
+}
+
 async function executeAndCheckBalance(sodaHelper, func, contract, user_key, expectedBalance){
     await sodaHelper.callContractFunctionTransaction(func);
     // Get my encrypted balance, decrypt it and check if it is equal to the expected balance
-    const my_CTBalance = await sodaHelper.callContractView("private_erc20", "balanceOf")
+    const my_CTBalance = await getEncryptedBalance(sodaHelper, contract)
     const my_balance = decryptValue(my_CTBalance, user_key);
     checkExpectedResult('transfer', expectedBalance, my_balance);
 }
@@ -92,16 +115,16 @@ async function main() {
     const user_key_hex = process.env.USER_KEY;
     const user_key = Buffer.from(user_key_hex, 'hex');
 
-    console.log("************* Initial balance = ", INITIAL_BALANCE, " *************");
-    let my_CTBalance = await sodaHelper.callContractView("private_erc20", "balanceOf")
-    let my_balance = decryptValue(my_CTBalance, user_key);
-    checkExpectedResult('balanceOf', INITIAL_BALANCE, my_balance);
-
     // Generate a new account for Alice
     const alice_address = sodaHelper.generateRandomAccount();
-
+    
     const contract = sodaHelper.getContract("private_erc20")
     const account = sodaHelper.getAccount();
+    
+    console.log("************* Initial balance = ", INITIAL_BALANCE, " *************");
+    const my_CTBalance = await getEncryptedBalance(sodaHelper, contract)
+    let my_balance = decryptValue(my_CTBalance, user_key);
+    checkExpectedResult('balanceOf', INITIAL_BALANCE, my_balance);
 
     const plaintext_integer = 5;
 

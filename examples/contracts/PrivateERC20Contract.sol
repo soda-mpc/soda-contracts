@@ -24,6 +24,7 @@ contract PrivateERC20Contract {
     event Transfer(address indexed _from, address indexed _to);
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
     event Approval(address indexed _owner, address indexed _spender);
+    event Balance(address indexed _owner, ctUint64 _balance);
 
 
     string private _name;
@@ -31,8 +32,6 @@ contract PrivateERC20Contract {
     uint8 private _decimals = 5;    // Sets the number of decimal places for token amounts. Here, _decimals is 5,
                                     // allowing for transactions with precision up to 0.00001 tokens.
     uint256 private _totalSupply;  
-
-    ctUint64 tempAllowance;
     
     // Mapping of balances of the token holders
     // The balances are stored encrypted by the system aes key
@@ -71,12 +70,14 @@ contract PrivateERC20Contract {
     // Since the balance is initially encrypted internally using the system's AES key, the user cannot access it. 
     // Thus, the balance undergoes re-encryption using the user's secret key. 
     // As a result, the function is not designated as a "view" function.
-    function balanceOf() public returns (ctUint64 balance){
+    function balanceOf() public returns (ctUint64){
         ctUint64 balance = balances[msg.sender];
         // The balance is saved encrypted using the system key. However, to allow the user to access it, the balance needs to be re-encrypted using the user key. 
         // Therefore, we decrypt the balance (onBoard) and then encrypt it again using the user key (offBoardToUser).
         gtUint64 balanceGt = MpcCore.onBoard(balance);
-        return MpcCore.offBoardToUser(balanceGt, msg.sender);
+        ctUint64 userBalance = MpcCore.offBoardToUser(balanceGt, msg.sender);
+        emit Balance(msg.sender, userBalance);
+        return userBalance;
     }
 
     // Transfers the amount of tokens given inside the IT (encrypted and signed value) to address _to
