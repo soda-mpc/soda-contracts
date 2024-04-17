@@ -6,8 +6,7 @@ on:
   pull_request:
     branches: [ "master" ]
   schedule:
-    # This schedule runs every 3 hours, at the start of the hour
-    - cron: '0 */3 * * *'
+    - cron: '0 0 * * *'  # Run at midnight every day
 
 jobs:
   build:
@@ -47,14 +46,14 @@ jobs:
           chmod +x onboardUser/scripts/js/gen_account.mjs
           node onboardUser/scripts/js/gen_account.mjs
           source .env
-          python -m onboardUser.scripts.python.transfer_native_coins ${{ secrets.SECRET_KEY }}
-          chmod +x onboardUser/scripts/js/onboard_user.mjs
-          node onboardUser/scripts/js/onboard_user.mjs
+          python -m onboardUser.scripts.python.transfer_native_coins ${{ secrets.SECRET_KEY }} Remote
+          chmod +x onboardUser/scripts/js/onboard_user.mjs 
+          node onboardUser/scripts/js/onboard_user.mjs Remote
     
       - name: Run js ERC20
         run: |
           source .env
-          node examples/scripts/js/run_private_erc20.mjs
+          node examples/scripts/js/run_private_erc20.mjs Remote
 
       - name: Onboard user - python
         run: |
@@ -62,19 +61,19 @@ jobs:
           chmod +x onboardUser/scripts/python/gen_account.py
           python -m onboardUser.scripts.python.gen_account
           source .env
-          python -m onboardUser.scripts.python.transfer_native_coins ${{ secrets.SECRET_KEY }}
+          python -m onboardUser.scripts.python.transfer_native_coins ${{ secrets.SECRET_KEY }} Remote
           chmod +x onboardUser/scripts/python/onboard_user.py
-          python -m onboardUser.scripts.python.onboard_user
+          python -m onboardUser.scripts.python.onboard_user Remote
 
       - name: Run tests
         run: |
           source .env
-          python -m tests.scripts.python.run_precompile_tests_contract
+          python -m tests.scripts.python.run_precompile_tests_contract Remote
 
       - name: Run python ERC20
         run: |
           source .env
-          python -m examples.scripts.python.run_private_erc20
+          python -m examples.scripts.python.run_private_erc20 Remote
   
       - name: Check Exit Codes
         run: |

@@ -2,6 +2,7 @@
   "dependencies": {
     "ethereumjs-util": "^7.1.5",
     "solc": "^0.8.19",
-    "web3": "^4.5.0"
+    "web3": "^4.5.0",
+    "yargs": "^17.7.2"
   }
 }
