@@ -34,17 +34,13 @@ def main():
     
     
     function = contract.functions.test()
-    soda_helper.call_contract_function_transaction_async("check_testnet", function)
-    soda_helper.inc_async_txs()
-    soda_helper.call_contract_function_transaction_async("check_testnet", function)
-    soda_helper.inc_async_txs()
     receipt = soda_helper.call_contract_function_transaction("check_testnet", function)
-    soda_helper.dec_async_txs()
 
     print("block number:", receipt.blockNumber)
 
 
     print(soda_helper.web3.eth.get_block(receipt.blockNumber).transactions)
+    print(soda_helper.web3.eth.get_block(receipt.blockNumber).difficulty)
 
 
     if receipt is None:
@@ -54,22 +50,14 @@ def main():
     output = contract.functions.getOutput().call({'from': account.address})
     print("Function call result:", output)
 
-    sleep(10)
-
-    # soda_helper1 = SodaWeb3Helper(private_key, 'http://localhost:7002')
-    # success = soda_helper1.setup_contract(FILE_PATH + FILE_NAME, "check_testnet")
-    # if not success:
-    #     print("Failed to set up the contract")
-    # contract1 = soda_helper1.get_contract("check_testnet")
-
-    # print("contract1:", contract1)
-    # print("Contract address:", contract.address)
-    # contract1.address = contract.address
-    # print("Contract 1 address:", contract1.address)
+    sleep(30)
 
     # Get the output
     output = contract.functions.getOutput().call({'from': account.address})
     print("Function call result:", output)
+
+    output = contract.functions.getBoolOutput().call({'from': account.address})
+    print("Function call bool result:", output)
 
 
 if __name__ == "__main__":
