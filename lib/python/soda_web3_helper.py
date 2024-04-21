@@ -41,13 +41,13 @@ class SodaWeb3Helper:
         self.contracts = {}
         print('SodaWeb3Helper initialized')
         
-    def setup_contract(self, contract_path, contract_id, overwrite=False):
+    def setup_contract(self, contract_path, contract_id, overwrite=False, mpc_inst_path="lib/solidity/MpcInterface.sol", mpc_core_path="lib/solidity/MpcCore.sol"):
         if contract_id in self.contracts and not overwrite:
             print(f"Contract with id {contract_id} already exists. Use the 'overwrite' parameter to overwrite it.")
             return False
         
         try:
-            contract_bytecode, contract_abi = compile_contract(contract_path)
+            contract_bytecode, contract_abi = compile_contract(contract_path, mpc_inst_path, mpc_core_path)
         except Exception as e:
             print(f"Failed to compile the contract: {e}")
             return False
@@ -178,6 +178,9 @@ class SodaWeb3Helper:
     def convert_gwei_to_wei(self, amount):
         return self.web3.to_wei(amount, 'gwei')
     
+    def wei_to_sod(self, amount):
+        return self.web3.from_wei(amount, 'ether')
+    
     def _build_transaction(self, func, gas_limit, gas_price, chain_id, tx_args=[], account=None):
         if account is None:
             account = self.account
@@ -224,6 +227,13 @@ class SodaWeb3Helper:
             return None
 
         return tx_receipt
+    
+    def send_signed_tx(self, raw_tx):
+        try:
+            return self.web3.eth.send_raw_transaction(raw_tx)
+        except Exception as e:
+            print(f"Failed to send the transaction: {e}")
+            return None
     
 def load_contract(file_path):
     # Ensure the file path is valid
