@@ -9,7 +9,7 @@ import argparse
 LOCAL_PROVIDER_URL = 'http://localhost:7000'
 REMOTE_HTTP_PROVIDER_URL = 'https://node.sodalabs.net' 
 SOLC_VERSION = '0.8.19'
-DEFAULT_GAS_PRICE = '30'
+DEFAULT_GAS_PRICE = 10
 DEFAULT_GAS_LIMIT = 10000000
 DEFAULT_CHAIN_ID = 50505050
 
@@ -41,7 +41,10 @@ class SodaWeb3Helper:
         self.contracts = {}
         print('SodaWeb3Helper initialized')
         
-    def setup_contract(self, contract_path, contract_id, overwrite=False, mpc_inst_path="lib/solidity/MpcInterface.sol", mpc_core_path="lib/solidity/MpcCore.sol"):
+    def setup_contract(self, contract_path, contract_id, overwrite=False, 
+                       mpc_inst_path="lib/solidity/MpcInterface.sol", 
+                       mpc_core_path="lib/solidity/MpcCore.sol"):
+        
         if contract_id in self.contracts and not overwrite:
             print(f"Contract with id {contract_id} already exists. Use the 'overwrite' parameter to overwrite it.")
             return False
@@ -166,7 +169,7 @@ class SodaWeb3Helper:
             'to': to_address,
             'value': self.web3.to_wei(amount, 'ether'),
             'gas': gas_limit,
-            'gasPrice': self.web3.to_wei(gas_price, 'wei'),
+            'gasPrice': gas_price,
             'nonce': self.web3.eth.get_transaction_count(account.address),
             'chainId': chain_id
         }
@@ -245,6 +248,9 @@ def load_contract(file_path):
         return file.read()
 
 def compile_contract(file_path, mpc_inst_path="lib/solidity/MpcInterface.sol", mpc_core_path="lib/solidity/MpcCore.sol"):
+    print(f'Current PWD: {os.getcwd()}')
+    print(f'MPC INST {mpc_inst_path}')
+    print(f'MPC CORE {mpc_core_path}')
     if SOLC_VERSION not in get_installed_solc_versions():
         install_solc(SOLC_VERSION)
         
@@ -269,7 +275,7 @@ def compile_contract(file_path, mpc_inst_path="lib/solidity/MpcInterface.sol", m
         },
     },
     solc_version=SOLC_VERSION,
-    allow_paths=["."]
+    allow_paths=[mpc_inst_path, mpc_core_path, file_path]
     )
 
     bytecode = compiled_sol['contracts'][file_path][contract_name]['evm']['bytecode']['object']
