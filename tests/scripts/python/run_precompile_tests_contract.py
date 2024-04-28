@@ -150,7 +150,8 @@ def checkCt(ct, decrypted_aes_key, expected_result):
 
 def test_getUserKey(soda_helper, contract, a, expected_result):
     private_key, public_key = generate_rsa_keypair()
-    signedEK = sign(public_key, bytes.fromhex("2e0834786285daccd064ca17f1654f67b4aef298acbb82cef9ec422fb4975622"))
+    signing_key = os.environ.get('SIGNING_KEY')
+    signedEK = sign(public_key, bytes.fromhex(signing_key[2:]))
     encryptedUserKey = soda_helper.call_contract_view(contract, "userKeyTest", func_args=[public_key, signedEK])
     decrypted_aes_key = decrypt_rsa(private_key, encryptedUserKey)
 
