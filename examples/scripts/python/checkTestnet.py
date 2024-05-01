@@ -56,6 +56,9 @@ def main():
     output = contract.functions.getOutput().call({'from': account.address})
     print("Function call result:", output)
 
+    output = contract.functions.getOutputMult().call({'from': account.address})
+    print("Function call result:", output)
+
     output = contract.functions.getBoolOutput().call({'from': account.address})
     print("Function call bool result:", output)
 
