@@ -3,15 +3,18 @@ import json
 from web3.middleware import geth_poa_middleware
 from eth_account import Account
 from web3 import Web3
+from web3.exceptions import TransactionNotFound
 from solcx import compile_standard, install_solc, get_installed_solc_versions
 import argparse
+from time import sleep
 
 LOCAL_PROVIDER_URL = 'http://localhost:7000'
 REMOTE_HTTP_PROVIDER_URL = 'https://node.sodalabs.net' 
 SOLC_VERSION = '0.8.19'
-DEFAULT_GAS_PRICE = 30
+DEFAULT_GAS_PRICE = 10
 DEFAULT_GAS_LIMIT = 10000000
 DEFAULT_CHAIN_ID = 50505050
+async_tx = 0
 
 def parse_url_parameter():
     parser = argparse.ArgumentParser(description='Get URL')
@@ -48,13 +51,16 @@ class SodaWeb3Helper:
     def dec_async_txs(self):
         self.async_txs -= 1
         
-    def setup_contract(self, contract_path, contract_id, overwrite=False):
+    def setup_contract(self, contract_path, contract_id, overwrite=False, 
+                       mpc_inst_path="lib/solidity/MpcInterface.sol", 
+                       mpc_core_path="lib/solidity/MpcCore.sol"):
+        
         if contract_id in self.contracts and not overwrite:
             print(f"Contract with id {contract_id} already exists. Use the 'overwrite' parameter to overwrite it.")
             return False
         
         try:
-            contract_bytecode, contract_abi = compile_contract(contract_path)
+            contract_bytecode, contract_abi = compile_contract(contract_path, mpc_inst_path, mpc_core_path)
         except Exception as e:
             print(f"Failed to compile the contract: {e}")
             return False
@@ -96,6 +102,67 @@ class SodaWeb3Helper:
                 abi=self.contracts[contract_id].abi,
                 bytecode=self.contracts[contract_id].bytecode)
         return receipt
+
+    def deploy_multi_contracts(self, 
+                        contracts_id, 
+                        gas_limit=DEFAULT_GAS_LIMIT, 
+                        gas_price=DEFAULT_GAS_PRICE, 
+                        chain_id=DEFAULT_CHAIN_ID, 
+                        constructor_args=[],
+                        account=None):
+        """
+        This function deploys multiple contracts to the Ethereum blockchain.
+
+        Args:
+            contracts_id (list): List of contract identifiers to be deployed.
+            gas_limit (int, optional): The maximum gas that can be used for transaction, defaults to DEFAULT_GAS_LIMIT.
+            gas_price (int, optional): The price of gas in wei for this transaction, defaults to DEFAULT_GAS_PRICE.
+            chain_id (int, optional): The id of the Ethereum chain, defaults to DEFAULT_CHAIN_ID.
+            constructor_args (list, optional): Arguments for the contract constructor, defaults to an empty list.
+            account (str, optional): The account from which to deploy the contracts, defaults to the current account.
+
+        Returns:
+            list: A list of transaction receipts for the deployed contracts.
+        """
+
+        if account is None:
+            account = self.account
+        
+        tx_hashes = []
+        global async_tx
+        
+        for contract_id in contracts_id:
+            func_to_call = self.contracts[contract_id].constructor
+            construct_txn = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, constructor_args, account)
+            tx_hashes.append(self._sign_and_send_transaction(construct_txn, account, is_async=True))
+            async_tx += 2 # When deploying a contract, two contracts are actually being deployed. So the nonce needs to be incremented by two for the next contract deployment.
+
+        if any([h is None for h in tx_hashes]):
+            raise Exception("Failed to deploy contracts.")
+
+        async_tx = 0
+
+        tx_receipts = [None]*len(tx_hashes)
+        print(f"Wait for transaction receipts: {tx_hashes}")
+                    
+        # Wait for transaction receipts for all contracts hashes
+        while not all(tx_receipts):
+            for i, tx_hash in enumerate(tx_hashes):
+                if tx_receipts[i] is not None:
+                    continue
+                try:
+                    tx_receipts[i] = self.web3.eth.get_transaction_receipt(tx_hash.hex())
+                except TransactionNotFound as e:
+                    pass
+            sleep(1)
+
+        for i, contract_id in enumerate(contracts_id):
+            print(f"Contract deployed at address: {tx_receipts[i].contractAddress}")
+            self.contracts[contract_id] = self.web3.eth.contract(
+                address=tx_receipts[i].contractAddress, 
+                abi=self.contracts[contract_id].abi,
+                bytecode=self.contracts[contract_id].bytecode)
+        return tx_receipts
     
     def call_contract_view(self, contract_id, func_name, func_args=[]):
         if contract_id not in self.contracts:
@@ -125,6 +192,33 @@ class SodaWeb3Helper:
         transaction = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, func_args, account)
         
         return self._sign_and_send_transaction(transaction, account)
+
+    def call_contract_transaction_async(self, 
+                                  contract_id, 
+                                  func_name, 
+                                  gas_limit=DEFAULT_GAS_LIMIT, 
+                                  gas_price=DEFAULT_GAS_PRICE, 
+                                  chain_id=DEFAULT_CHAIN_ID, 
+                                  func_args=[], 
+                                  account=None):
+        if account is None:
+            account = self.account
+
+        if contract_id not in self.contracts:
+            print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
+            return None
+
+        global async_tx
+        func_to_call = getattr(self.contracts[contract_id].functions, func_name)
+        transaction = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, func_args, account)
+
+        async_tx += 1
+        
+        return self._sign_and_send_transaction(transaction, account, is_async=True)
+
+    def init_async_tx(self):
+        global async_tx
+        async_tx = 0
 
     def call_contract_function_transaction(self, 
                                   contract_id, 
@@ -196,7 +290,7 @@ class SodaWeb3Helper:
             'to': to_address,
             'value': self.web3.to_wei(amount, 'ether'),
             'gas': gas_limit,
-            'gasPrice': self.web3.to_wei(gas_price, 'wei'),
+            'gasPrice': gas_price,
             'nonce': self.web3.eth.get_transaction_count(account.address),
             'chainId': chain_id
         }
@@ -207,6 +301,8 @@ class SodaWeb3Helper:
     
     def convert_gwei_to_wei(self, amount):
         return self.web3.to_wei(amount, 'gwei')
+    def wei_to_sod(self, amount):
+        return self.web3.from_wei(amount, 'ether')
     
     def _build_transaction(self, func, gas, gas_price, chain_id, tx_args=[], account=None):
         if account is None:
@@ -215,7 +311,7 @@ class SodaWeb3Helper:
         return func(*tx_args).build_transaction({
             'from': account.address,
             'chainId': chain_id,
-            'nonce': self.web3.eth.get_transaction_count(account.address),
+            'nonce': self.web3.eth.get_transaction_count(account.address) + async_tx,
             'gas': gas,
             'gasPrice': self.web3.to_wei(gas_price, 'wei')
         })  
@@ -232,7 +328,7 @@ class SodaWeb3Helper:
             'gasPrice': self.web3.to_wei(gas_price, 'wei')
         })  
     
-    def _sign_and_send_transaction(self, transaction, account, receipt=True):
+    def _sign_and_send_transaction(self, transaction, account, is_async=False):
         if account is None:
             account = self.account
         try:
@@ -246,10 +342,9 @@ class SodaWeb3Helper:
         except Exception as e:
             print(f"Failed to send the transaction: {e}")
             return None
-
-        if not receipt:
-            return None
-
+        if is_async:
+            return tx_hash
+        
         try:
             tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
         except Exception as e:
@@ -257,6 +352,13 @@ class SodaWeb3Helper:
             return None
 
         return tx_receipt
+    
+    def send_signed_tx(self, raw_tx):
+        try:
+            return self.web3.eth.send_raw_transaction(raw_tx)
+        except Exception as e:
+            print(f"Failed to send the transaction: {e}")
+            return None
     
 def load_contract(file_path):
     # Ensure the file path is valid
@@ -268,6 +370,9 @@ def load_contract(file_path):
         return file.read()
 
 def compile_contract(file_path, mpc_inst_path="lib/solidity/MpcInterface.sol", mpc_core_path="lib/solidity/MpcCore.sol"):
+    print(f'Current PWD: {os.getcwd()}')
+    print(f'MPC INST {mpc_inst_path}')
+    print(f'MPC CORE {mpc_core_path}')
     if SOLC_VERSION not in get_installed_solc_versions():
         install_solc(SOLC_VERSION)
         
@@ -292,7 +397,7 @@ def compile_contract(file_path, mpc_inst_path="lib/solidity/MpcInterface.sol", m
         },
     },
     solc_version=SOLC_VERSION,
-    allow_paths=["."]
+    allow_paths=[mpc_inst_path, mpc_core_path, file_path]
     )
 
     bytecode = compiled_sol['contracts'][file_path][contract_name]['evm']['bytecode']['object']
