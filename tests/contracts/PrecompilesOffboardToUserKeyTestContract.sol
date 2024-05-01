@@ -42,9 +42,10 @@ contract PrecompilesOffboardToUserKeyTestContract {
         return ctUserKey;
     }
 
-    function userKeyTest(bytes calldata signedEK, bytes calldata signature) public view returns (bytes memory key) {
+    function userKeyTest(bytes calldata signedEK, bytes calldata signature) public returns (bytes memory key) {
 
-        return MpcCore.getUserKey(signedEK, signature);
+        userKey = MpcCore.getUserKey(signedEK, signature);
+        return userKey;
     }
 
     function offboardToUserTest(uint8 a, address addr) public returns (uint256, uint256, uint256, uint256) {

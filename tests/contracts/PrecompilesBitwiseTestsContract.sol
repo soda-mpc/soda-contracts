@@ -40,10 +40,18 @@ contract PrecompilesBitwiseTestsContract {
         gtUint64 res64_32;
     }
 
-    uint8 result;
+    uint8 andResult;
+    uint8 orResult;
+    uint8 xorResult;
 
-    function getResult() public view returns (uint8) {
-        return result;
+    function getAndResult() public view returns (uint8) {
+        return andResult;
+    }
+    function getOrResult() public view returns (uint8) {
+        return orResult;
+    }
+    function getXorResult() public view returns (uint8) {
+        return xorResult;
     }
 
     function setPublicValues(AllGTCastingValues memory castingValues, uint8 a, uint8 b) public{
@@ -101,8 +109,9 @@ contract PrecompilesBitwiseTestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.and(castingValues.a8_s, castingValues.b8_s));
-       
+        uint8 result =  MpcCore.decrypt(MpcCore.and(castingValues.a8_s, castingValues.b8_s));
+        andResult = result;
+
         // Calculate the results with casting to 16
         check16.res16_16 = MpcCore.and(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.and(castingValues.a8_s, castingValues.b16_s);
@@ -151,8 +160,9 @@ contract PrecompilesBitwiseTestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.or(castingValues.a8_s, castingValues.b8_s));
-       
+        uint8 result =  MpcCore.decrypt(MpcCore.or(castingValues.a8_s, castingValues.b8_s));
+        orResult = result;
+
         // Calculate the results with casting to 16
         check16.res16_16 = MpcCore.or(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.or(castingValues.a8_s, castingValues.b16_s);
@@ -201,8 +211,9 @@ contract PrecompilesBitwiseTestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.xor(castingValues.a8_s, castingValues.b8_s));
-       
+        uint8 result =  MpcCore.decrypt(MpcCore.xor(castingValues.a8_s, castingValues.b8_s));
+        xorResult = result;
+
         // Calculate the results with casting to 16
         check16.res16_16 = MpcCore.xor(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.xor(castingValues.a8_s, castingValues.b16_s);

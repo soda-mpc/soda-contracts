@@ -6,6 +6,7 @@ import "MpcCore.sol";
 contract PrecompilesMiscellaneous1TestsContract {
 
     uint64 random = 0;
+    uint64 randomBounded = 0;
     bool andRes;
     bool orRes;
     bool xorRes;
@@ -17,6 +18,10 @@ contract PrecompilesMiscellaneous1TestsContract {
 
     function getRandom() public view returns (uint64) {
         return random;
+    }
+
+    function getRandomBounded() public view returns (uint64) {
+        return randomBounded;
     }
 
     function getBooleanResults() public view returns (bool, bool, bool, bool, bool, bool, bool, bool) {
@@ -65,7 +70,7 @@ contract PrecompilesMiscellaneous1TestsContract {
                 randoms[i] = MpcCore.decrypt(MpcCore.randBoundedBits8(numBits));
             }
         }
-        random = randoms[0];
+        
         if (isBounded) {
             // Check that all randoms are in bounds
             checkBound(randoms, size, numBits);
@@ -123,9 +128,13 @@ contract PrecompilesMiscellaneous1TestsContract {
                 randoms[i] = MpcCore.decrypt(MpcCore.randBoundedBits64(numBits));
             }
         }
+
         if (isBounded) {
             // Check that all randoms are in bounds
             checkBound(randoms, size, numBits);
+            randomBounded = randoms[0];
+        } else {
+            random = randoms[0];
         }
         // Check that not all the generated random values are the same
         checkNotAllEqual(randoms, size);

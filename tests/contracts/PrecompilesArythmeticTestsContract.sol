@@ -54,11 +54,16 @@ contract PrecompilesArythmeticTestsContract {
         gtUint64 res64_32;
     }
 
-    uint8 result;
+    uint8 addResult;
+    uint8 subResult;
     uint16 result16;
 
-    function getResult() public view returns (uint8) {
-        return result;
+    function getAddResult() public view returns (uint8) {
+        return addResult;
+    }
+
+    function getSubResult() public view returns (uint8) {
+        return subResult;
     }
 
     function getResult16() public view returns (uint16) {
@@ -119,7 +124,8 @@ contract PrecompilesArythmeticTestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.add(castingValues.a8_s, castingValues.b8_s));
+        uint8 result =  MpcCore.decrypt(MpcCore.add(castingValues.a8_s, castingValues.b8_s));
+        addResult = result;
     
         // Calculate the results with casting to 16
         check16.res16_16 = MpcCore.add(castingValues.a16_s, castingValues.b16_s);
@@ -169,8 +175,9 @@ contract PrecompilesArythmeticTestsContract {
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result =  MpcCore.decrypt(MpcCore.sub(castingValues.a8_s, castingValues.b8_s));
-        
+        uint8 result =  MpcCore.decrypt(MpcCore.sub(castingValues.a8_s, castingValues.b8_s));
+        subResult = result;
+    
         // Calculate the results with casting to 16
         check16.res16_16 = MpcCore.sub(castingValues.a16_s, castingValues.b16_s);
         check16.res8_16 = MpcCore.sub(castingValues.a8_s, castingValues.b16_s);
