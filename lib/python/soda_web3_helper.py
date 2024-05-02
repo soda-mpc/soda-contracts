@@ -225,8 +225,31 @@ class SodaWeb3Helper:
             return None
         
         transaction = self._build_function_transaction(func, gas_limit, gas_price, chain_id, account)
+        global async_tx
+        async_tx = 0
         
         return self._sign_and_send_transaction(transaction, account)
+
+    def call_contract_function_transaction_async(self, 
+                                  contract_id, 
+                                  func, 
+                                  gas_limit=DEFAULT_GAS_LIMIT, 
+                                  gas_price=DEFAULT_GAS_PRICE, 
+                                  chain_id=DEFAULT_CHAIN_ID, 
+                                  account=None):
+        if account is None:
+            account = self.account
+        
+        if contract_id not in self.contracts:
+            print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
+            return None
+        
+        transaction = self._build_function_transaction(func, gas_limit, gas_price, chain_id, account)
+
+        global async_tx
+        async_tx += 1
+        
+        return self._sign_and_send_transaction(transaction, account, is_async=True)
     
     def generate_random_account(self):
         return Account.create()
@@ -294,7 +317,7 @@ class SodaWeb3Helper:
         return func.build_transaction({
             'from': account.address,
             'chainId': chain_id,
-            'nonce': self.web3.eth.get_transaction_count(account.address),
+            'nonce': self.web3.eth.get_transaction_count(account.address) + async_tx,
             'gas': gas_limit,
             'gasPrice': self.web3.to_wei(gas_price, 'wei')
         })  

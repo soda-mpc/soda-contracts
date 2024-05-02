@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ "master" ]
   schedule:
-    - cron: '0 0 * * *'  # Run at midnight every day
+    - cron: '0 0,12 * * *'  # Run twice a day
 
 jobs:
   build:
@@ -34,10 +34,6 @@ jobs:
         run: |
           pip install -r requirements.txt
           npm install
-          # cd onboardUser/scripts/js
-          # npm install
-          # cd ../../../soda-sdk/js
-          # npm install
           cd lib/js
           npm install
 

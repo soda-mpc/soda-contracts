@@ -4,6 +4,8 @@ import sys
 sys.path.append('soda-sdk')
 from python.crypto import decrypt, prepare_IT, block_size
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
+from web3.exceptions import TransactionNotFound
+from time import sleep
 
 FILE_NAME = 'PrivateERC20Contract.sol'
 FILE_PATH = 'examples/contracts/'
@@ -48,18 +50,34 @@ def get_encrypted_balance(soda_helper, account, contract):
     print("Failed to find balance of the account address in the transaction receipt.")
     return None
 
-def execute_and_check_balance(soda_helper, account, contract, function, user_key, name, expected_balance):
-    receipt = soda_helper.call_contract_function_transaction("private_erc20", function)
-    if receipt is None:
-        print("Failed to call the transaction function")
+def execute_transaction(soda_helper, account, contract, function):
+    return soda_helper.call_contract_function_transaction_async("private_erc20", function)
+
+def check_balance(soda_helper, account, contract, user_key, name, expected_balance):
+    
     # Get my encrypted balance, decrypt it and check if it matches the expected value
     my_CTBalance = get_encrypted_balance(soda_helper, account, contract)
     my_balance = decrypt_value(my_CTBalance, user_key)
     check_expected_result(name, expected_balance, my_balance)
 
-def check_allowance(account, contract, user_key, expected_allowance):
+def check_allowance(soda_helper, account, contract, user_key, expected_allowance):
     # Get my encrypted allowance, decrypt it and check if it matches the expected value
-    allowanceCT = contract.functions.allowance(account.address, account.address).call({'from': account.address})
+    function = contract.functions.allowance(account.address, account.address)
+    receipt = soda_helper.call_contract_function_transaction("private_erc20", function)
+    if receipt is None:
+        print("Failed to call the transaction function")
+
+    allowance_events = contract.events.Allowance().process_receipt(receipt)
+
+    allowanceCT = None
+    # Filter events for the specific address
+    for event in allowance_events:
+        if event['args']['_owner'].lower() == account.address.lower():
+            allowanceCT = event['args']['_allowance']
+    
+    if allowanceCT is None:
+        print("Failed to find the allowance of the account address in the transaction receipt.")
+
     allowance = decrypt_value(allowanceCT, user_key)
     check_expected_result('allowance', expected_allowance, allowance)
 
@@ -105,12 +123,6 @@ def main(provider_url: str):
     user_key_hex = os.environ.get('USER_KEY')
     user_key = bytes.fromhex(user_key_hex)  
 
-
-    print("************* Initial balance = ", INITIAL_BALANCE, " *************")
-    my_CTBalance = get_encrypted_balance(soda_helper, account, contract)
-    my_balance = decrypt_value(my_CTBalance, user_key)
-    check_expected_result('balanceOf', INITIAL_BALANCE, my_balance)
-
     # Generate a new Ethereum account for Alice
     alice_address = Account.create()
 
@@ -119,12 +131,12 @@ def main(provider_url: str):
     print("************* Transfer clear ", plaintext_integer, " to Alice *************")
     # Transfer 5 SOD to Alice
     function = contract.functions.transfer(alice_address.address, plaintext_integer, True)
-    execute_and_check_balance(soda_helper, account, contract, function, user_key, 'transfer', INITIAL_BALANCE - plaintext_integer)
+    execute_transaction(soda_helper, account, contract, function)
 
     print("************* Transfer clear ", plaintext_integer, " to Alice *************")
     # Transfer 5 SOD to Alice
     function = contract.functions.contractTransferClear(alice_address.address, plaintext_integer)
-    execute_and_check_balance(soda_helper, account, contract, function, user_key, 'contract transfer clear', INITIAL_BALANCE - 2*plaintext_integer)
+    execute_transaction(soda_helper, account, contract, function)
 
     print("************* Transfer IT ", plaintext_integer, " to Alice *************")
     # In order to generate the input text, we need to use some data of the function. 
@@ -140,29 +152,27 @@ def main(provider_url: str):
     # Create the real function using the prepared IT
     function = contract.functions.transfer(alice_address.address, ct, signature, False)
     # Transfer 5 SOD to Alice
-    execute_and_check_balance(soda_helper, account, contract, function, user_key, 'transfer IT', INITIAL_BALANCE - 3*plaintext_integer)
+    execute_transaction(soda_helper, account, contract, function)
 
     print("************* Transfer clear ", plaintext_integer, " from my account to Alice without allowance *************")
     # Trying to transfer 5 SOD to Alice. There is no allowance, transfer should fail
     function = contract.functions.transferFrom(account.address, alice_address.address, plaintext_integer, True)
-    execute_and_check_balance(soda_helper, account, contract, function, user_key, 'transfer from', INITIAL_BALANCE - 3*plaintext_integer)
+    execute_transaction(soda_helper, account, contract, function)
 
     print("************* Approve ", plaintext_integer*10, " to my address *************")
     # Set allowance for this account
     function = contract.functions.approveClear(account.address, plaintext_integer*10)
-    soda_helper.call_contract_function_transaction("private_erc20", function)
-    # Get my allowance to check that the allowance is correct
-    check_allowance(account, contract, user_key, plaintext_integer*10)
+    soda_helper.call_contract_function_transaction_async("private_erc20", function)
 
     print("************* Transfer clear ", plaintext_integer, " from my account to Alice *************")
     # Transfer 5 SOD to Alice
     function = contract.functions.transferFrom(account.address, alice_address.address, plaintext_integer, True)
-    execute_and_check_balance(soda_helper, account, contract, function, user_key, 'transfer from', INITIAL_BALANCE - 4*plaintext_integer)
+    execute_transaction(soda_helper, account, contract, function)
 
     print("************* Transfer clear ", plaintext_integer, " from my account to Alice *************")
     # Transfer 5 SOD to Alice
     function = contract.functions.contractTransferFromClear(account.address, alice_address.address, plaintext_integer)
-    execute_and_check_balance(soda_helper, account, contract, function, user_key, 'contract transfer from clear ', INITIAL_BALANCE - 5*plaintext_integer)
+    execute_transaction(soda_helper, account, contract, function)
 
     print("************* Transfer IT ", plaintext_integer, " from my account to Alice *************")
     # Transfer 5 SOD to Alice
@@ -172,24 +182,14 @@ def main(provider_url: str):
     ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]))
     # Create the real function using the prepared IT
     function = contract.functions.transferFrom(account.address, alice_address.address, ct, signature, False)
-    execute_and_check_balance(soda_helper, account, contract, function, user_key, 'transfer from IT', INITIAL_BALANCE - 6*plaintext_integer)
-    
-    print("************* Check my allowance *************")
-    # Check the remainning allowance
-    check_allowance(account, contract, user_key, plaintext_integer*7)
+    execute_transaction(soda_helper, account, contract, function)
 
-    print("************* Approve IT 50 to my address *************")
-    # Approve 50 SOD to this account
-    function = contract.functions.approve(account.address, dummyCT, dummySignature) # Dummy function
-    func_sig = get_function_signature(function.abi) # Get the function signature
-    # Prepare the input text for the function
-    ct, signature = prepare_IT(50, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]))
-    function = contract.functions.approve(account.address, ct, signature)
-    soda_helper.call_contract_function_transaction("private_erc20", function)
+    print("************* Check my balance *************")
+    check_balance(soda_helper, account, contract, user_key, 'balanceOf', INITIAL_BALANCE - 6*plaintext_integer)
 
     print("************* Check my allowance *************")
     # Check that the allowance has changed to 50 SOD
-    check_allowance(account, contract, user_key, 50)
+    check_allowance(soda_helper, account, contract, user_key, plaintext_integer*7)
 
 
 

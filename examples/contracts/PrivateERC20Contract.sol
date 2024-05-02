@@ -25,6 +25,7 @@ contract PrivateERC20Contract {
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
     event Approval(address indexed _owner, address indexed _spender);
     event Balance(address indexed _owner, ctUint64 _balance);
+    event Allowance(address indexed _owner, ctUint64 _allowance);
 
 
     string private _name;
@@ -274,7 +275,10 @@ contract PrivateERC20Contract {
             
         ctUint64 remainingCt = getGTAllowance(_owner, _spender);
         gtUint64 remainingGt = MpcCore.onBoard(remainingCt);
-        return MpcCore.offBoardToUser(remainingGt, msg.sender);
+        ctUint64 allowance = MpcCore.offBoardToUser(remainingGt, msg.sender);
+        emit Allowance(msg.sender, allowance);
+
+        return allowance;
     }
 
     // Returns the encrypted allowance of the spender. The encryption is done using the system aes key
