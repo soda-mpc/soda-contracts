@@ -33,7 +33,7 @@ def main():
     print("contract:", contract)
     
     
-    function = contract.functions.test()
+    function = contract.functions.test(soda_helper.get_account().address)
     receipt = soda_helper.call_contract_function_transaction("check_testnet", function)
 
     print("block number:", receipt.blockNumber)
@@ -50,7 +50,11 @@ def main():
     output = contract.functions.getOutput().call({'from': account.address})
     print("Function call result:", output)
 
-    sleep(30)
+    output = contract.functions.getUserCt().call({'from': account.address})
+    print("Function call result:", output)
+
+
+    sleep(10)
 
     # Get the output
     output = contract.functions.getOutput().call({'from': account.address})
@@ -61,6 +65,26 @@ def main():
 
     output = contract.functions.getBoolOutput().call({'from': account.address})
     print("Function call bool result:", output)
+
+    ct = contract.functions.getUserCt().call({'from': account.address})
+    print("Function call result:", ct)
+
+    # Convert ct to bytes (big-endian)
+    byte_array = ct.to_bytes(32, byteorder='big')
+
+    # Split ct into two 128-bit arrays r and cipher
+    cipher = byte_array[:16]
+    r = byte_array[16:]
+
+    user_key_hex = os.environ.get('USER_KEY')
+    user_key = bytes.fromhex(user_key_hex)  
+    
+    # Decrypt the cipher
+    decrypted_message = decrypt(user_key, r, cipher)
+
+    # Print the decrypted cipher
+    x = int.from_bytes(decrypted_message, 'big')
+    print("Decrypted message:", x)
 
 
 if __name__ == "__main__":

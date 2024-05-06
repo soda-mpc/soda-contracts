@@ -2,7 +2,7 @@ import os
 import sys
 from time import sleep
 sys.path.append('soda-sdk')
-from python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, decrypt_rsa, encrypt_rsa, sign, decrypt
+from python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, recover_user_key, sign, decrypt
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 from web3.exceptions import TransactionNotFound
 
@@ -132,8 +132,8 @@ def checkCt(ct, decrypted_aes_key, expected_result):
 
 def test_getUserKey(soda_helper, contract, a, expected_result, public_key):
     signing_key = os.environ.get('SIGNING_KEY')
-    signedEK = sign(public_key, bytes.fromhex(signing_key[2:]))
-    execute_transaction("get user key", soda_helper, contract, "userKeyTest", func_args=[public_key, signedEK])
+    signature = sign(public_key, bytes.fromhex(signing_key[2:]))
+    execute_transaction("get user key", soda_helper, contract, "userKeyTest", func_args=[public_key, signature])
 
     execute_transaction("offboard to user", soda_helper, contract, "offboardToUserTest", func_args=[a, soda_helper.get_account().address])
 
@@ -241,14 +241,14 @@ def checkResults(soda_helper, expected_results, private_key):
     check_expected_result("boolean_mux", expected_results["boolean_mux"], muxRes)
     check_expected_result("boolean_onboard_offboard", expected_results["boolean_onboard_offboard"], onboardRes)
 
-    # encryptedUserKey = soda_helper.call_contract_view("PrecompilesOffboardToUserKeyTestContract.sol", "getUserKey")
-    # decrypted_aes_key = decrypt_rsa(private_key, encryptedUserKey)
+    (encryptedKey0, encryptedKey1) = soda_helper.call_contract_view("PrecompilesOffboardToUserKeyTestContract.sol", "getUserKeyShares")
+    decrypted_aes_key = recover_user_key(private_key, encryptedKey0, encryptedKey1)
 
-    # ct8, ct16, ct32, ct64 = soda_helper.call_contract_view("PrecompilesOffboardToUserKeyTestContract.sol", "getCTs")
-    # checkCt(ct8, decrypted_aes_key, expected_results["offboard_user"])
-    # checkCt(ct16, decrypted_aes_key, expected_results["offboard_user"])
-    # checkCt(ct32, decrypted_aes_key, expected_results["offboard_user"])
-    # checkCt(ct64, decrypted_aes_key, expected_results["offboard_user"])
+    ct8, ct16, ct32, ct64 = soda_helper.call_contract_view("PrecompilesOffboardToUserKeyTestContract.sol", "getCTs")
+    checkCt(ct8, decrypted_aes_key, expected_results["offboard_user"])
+    checkCt(ct16, decrypted_aes_key, expected_results["offboard_user"])
+    checkCt(ct32, decrypted_aes_key, expected_results["offboard_user"])
+    checkCt(ct64, decrypted_aes_key, expected_results["offboard_user"])
 
     # global last_random_result  # Use the global keyword to use and modify the global variable
     # result = soda_helper.call_contract_view("PrecompilesMiscellaneous1TestsContract.sol", "getRandom")
@@ -400,13 +400,11 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b):
     expected_results["boolean_mux"] = bool_b if bit else bool_a
     expected_results["boolean_onboard_offboard"] = bool_a
 
-    # These test cannot be run in the current testnet stage
-    # TODO add them after the MPC is running
     # Test getUserKey
-    # print("Run get user key test...")
+    print("Run get user key test...")
     private_key, public_key = generate_rsa_keypair()
-    # test_getUserKey(soda_helper, 'PrecompilesOffboardToUserKeyTestContract.sol', a, a, public_key)
-    # expected_results["offboard_user"] = a
+    test_getUserKey(soda_helper, 'PrecompilesOffboardToUserKeyTestContract.sol', a, a, public_key)
+    expected_results["offboard_user"] = a
 
     # # test random
     # print("Run random test...")

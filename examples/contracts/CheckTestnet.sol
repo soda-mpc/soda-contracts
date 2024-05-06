@@ -8,6 +8,7 @@ contract CheckTestnet {
     uint32 output = 3;
     uint64 outputMult = 3;
     bool ok;
+    ctUint32 userCt = ctUint32.wrap(0);
 
     function getBoolOutput() public view returns (bool){
         return ok;
@@ -21,7 +22,11 @@ contract CheckTestnet {
         return outputMult;
     }
 
-    function test() public {
+    function getUserCt() public view returns (ctUint32) {
+        return userCt;
+    }
+
+    function test(address addr) public {
         gtUint32 x = MpcCore.setPublic32(10); // x = 10
         gtUint32 y = MpcCore.setPublic32(3);  // y = 3
         gtBool gtok = MpcCore.setPublic(true); // gtok = true
@@ -57,7 +62,7 @@ contract CheckTestnet {
         gtok = MpcCore.le(b , 20); // gtok = true
         gtok = MpcCore.lt(b , 20); // gtok = false
 
-
+        userCt = MpcCore.offBoardToUser(b, addr);
         output = MpcCore.decrypt(a);
         
         ok = MpcCore.decrypt(gtok);

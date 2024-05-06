@@ -43,6 +43,7 @@ library MpcCore {
 
     enum MPC_TYPE {SBOOL_T , SUINT8_T , SUINT16_T, SUINT32_T ,SUINT64_T }
     enum ARGS {BOTH_SECRET , LHS_PUBLIC, RHS_PUBLIC  }
+    uint public constant RSA_SIZE = 256; 
 
     function combineEnumsToBytes2(MPC_TYPE mpcType, ARGS argsType) internal pure returns (bytes2) {
         return bytes2(uint16(mpcType) << 8 | uint8(argsType));
@@ -60,8 +61,7 @@ library MpcCore {
         return bytes5(uint40(mpcType1) << 32 | uint32(mpcType2) << 24 | uint24(mpcType3) << 16 | uint16(mpcType4) << 8 | uint8(argsType));
     }
 
-    function getUserKey(bytes calldata signedEK, bytes calldata signature) internal view returns (bytes memory encryptedKey) {
-        // Combine array from signedEK and signature
+    function getUserKey(bytes calldata signedEK, bytes calldata signature) internal returns (bytes memory keyShare0, bytes memory keyShare1) {
         bytes memory combined = new bytes(signature.length + signedEK.length);
 
         // Copy contents of signature into combined
@@ -73,7 +73,20 @@ library MpcCore {
         for (uint j = 0; j < signedEK.length; j++) {
             combined[signature.length + j] = signedEK[j];
         }
-        return ExtendedOperations(address(MPC_PRECOMPILE)).GetUserKey(combined);
+        bytes memory bothKeys = ExtendedOperations(address(MPC_PRECOMPILE)).GetUserKey(combined);
+        bytes memory share0 = new bytes(RSA_SIZE);
+        bytes memory share1 = new bytes(RSA_SIZE);
+
+        // Copy the first key to the first share array
+        for (uint i = 0; i < share0.length; i++) {
+            share0[i] = bothKeys[i];
+        }
+
+        // Copy the second key to the second share array
+        for (uint i = 0; i < share1.length; i++) {
+            share1[i] = bothKeys[i + RSA_SIZE];
+        }
+        return (share0, share1);
     }
 
     

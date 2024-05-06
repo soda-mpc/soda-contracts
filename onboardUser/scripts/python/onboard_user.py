@@ -1,8 +1,9 @@
 import os
 import sys
 sys.path.append('soda-sdk')
-from python.crypto import generate_rsa_keypair, decrypt_rsa, sign
+from python.crypto import generate_rsa_keypair, sign, recover_user_key
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
+from time import sleep
 
 FILE_NAME = 'GetUserKeyContract.sol'
 FILE_PATH = 'onboardUser/contracts/'
@@ -28,17 +29,19 @@ def main(provider_url: str):
     # Generate new RSA key pair
     private_key, public_key = generate_rsa_keypair()
     # Sign the public key
-    signedEK = sign(public_key, bytes.fromhex(signing_key[2:]))
+    signature = sign(public_key, bytes.fromhex(signing_key[2:]))
 
     # Call the getUserKey function to get the encrypted AES key
-    receipt = soda_helper.call_contract_transaction("onboard_user", "getUserKey", func_args=[public_key, signedEK])
+    receipt = soda_helper.call_contract_transaction("onboard_user", "getUserKey", func_args=[public_key, signature])
     if receipt is None:
         print("Failed to call the transaction function")
         return
-    encryptedKey = contract.functions.getSavedUserKey().call()
-    
+
+    sleep(30)
+    encryptedKey0, encryptedKey1 = contract.functions.getSavedUserKey().call()
+
     # Decrypt the aes key using the RSA private key
-    decrypted_aes_key = decrypt_rsa(private_key, encryptedKey)
+    decrypted_aes_key = recover_user_key(private_key, encryptedKey0, encryptedKey1)
     
     # Write the data to a .env file
     with open('.env', 'a') as f:

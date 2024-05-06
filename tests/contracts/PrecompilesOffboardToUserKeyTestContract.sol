@@ -5,7 +5,8 @@ import "MpcCore.sol";
 
 contract PrecompilesOffboardToUserKeyTestContract {
 
-    bytes userKey;
+    bytes keyShare0;
+    bytes keyShare1;
     uint8 x;
     ctUint8 ctUserKey;
 
@@ -22,7 +23,7 @@ contract PrecompilesOffboardToUserKeyTestContract {
 
         gtUint8 a = MpcCore.setPublic8(uint8(5));
         gtUint8 c = MpcCore.add(a, uint8(5)); // 10
-        userKey = MpcCore.getUserKey(signedEK, signature);
+        (keyShare0, keyShare1) = MpcCore.getUserKey(signedEK, signature);
         ctUserKey = MpcCore.offBoardToUser(c, addr);
         ctUint8 ctSystemKey = MpcCore.offBoard(c);
         gtUint8 c1 = MpcCore.onBoard(ctSystemKey);
@@ -34,18 +35,18 @@ contract PrecompilesOffboardToUserKeyTestContract {
         return x;
     }
 
-    function getUserKey() public view returns (bytes memory) {
-        return userKey;
+    function getUserKeyShares() public view returns (bytes memory, bytes memory) {
+        return (keyShare0, keyShare1);
     }
 
     function getCt() public view returns (ctUint8) {
         return ctUserKey;
     }
 
-    function userKeyTest(bytes calldata signedEK, bytes calldata signature) public returns (bytes memory key) {
+    function userKeyTest(bytes calldata signedEK, bytes calldata signature) public returns (bytes memory, bytes memory) {
 
-        userKey = MpcCore.getUserKey(signedEK, signature);
-        return userKey;
+        (keyShare0, keyShare1) = MpcCore.getUserKey(signedEK, signature);
+        return (keyShare0, keyShare1);
     }
 
     function offboardToUserTest(uint8 a, address addr) public returns (uint256, uint256, uint256, uint256) {

@@ -5,17 +5,18 @@ import "MpcCore.sol";
 
 contract GetUserKeyContract {
 
-    bytes userKey;
+    bytes keyShare0;
+    bytes keyShare1;
 
-    function getSavedUserKey() public view returns (bytes memory) {
-        return userKey;
+    function getSavedUserKey() public view returns (bytes memory, bytes memory) {
+        return (keyShare0, keyShare1);
     }
 
     
-    function getUserKey(bytes calldata signedEK, bytes calldata signature) public returns (bytes memory) {
+    function getUserKey(bytes calldata signedEK, bytes calldata signature) public returns (bytes memory, bytes memory) {
 
-        userKey = MpcCore.getUserKey(signedEK, signature);
-        return userKey;
+        (keyShare0, keyShare1) = MpcCore.getUserKey(signedEK, signature);
+        return (keyShare0, keyShare1);
     }
 
 }

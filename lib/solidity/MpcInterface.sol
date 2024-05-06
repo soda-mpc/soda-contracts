@@ -34,7 +34,7 @@ interface ExtendedOperations {
     function Transfer(bytes4 metaData, uint256 a, uint256 b, uint256 amount) external returns (uint256 new_a, uint256 new_b, uint256 res);
     function TransferWithAllowance(bytes5 metaData, uint256 a, uint256 b, uint256 amount, uint256 allowance) external returns (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance);
     function ValidateCiphertext(bytes1 metaData, uint256 ciphertext, bytes calldata signature) external returns (uint256 result);
-    function GetUserKey(bytes calldata signedEK) external view returns (bytes memory encryptedKey);
+    function GetUserKey(bytes calldata signedEK) external returns (bytes memory encryptedKey);
 }
 
 address constant MPC_PRECOMPILE = address(0x0000000000000000000000000000000000000064);
