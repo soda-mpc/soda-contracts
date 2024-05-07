@@ -1,9 +1,13 @@
 import fs from 'fs';
-import { generateRSAKeyPair, decryptRSA, sign } from '../../../soda-sdk/js/crypto.js';
+import { generateRSAKeyPair, recoverUserKey, sign } from '../../../soda-sdk/js/crypto.js';
 import {SodaWeb3Helper, parseURLParameter} from '../../../lib/js/sodaWeb3Helper.mjs';
 
 const FILE_NAME = 'GetUserKeyContract.sol';
 const FILE_PATH = 'onboardUser/contracts/';
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 async function main() {
     const url = parseURLParameter();
@@ -35,14 +39,23 @@ async function main() {
     const signedEK = sign(publicKey, Buffer.from(SIGNING_KEY.slice(2), 'hex'));
     
     // Call the getUserKey function to get the encrypted AES key
-    await sodaHelper.callContractTransaction("onboard_user", "getUserKey", [publicKey, signedEK]);
-    const encryptedKey = await sodaHelper.callContractView("onboard_user", "getSavedUserKey")
-
+    receipt = await sodaHelper.callContractTransaction("onboard_user", "getUserKey", [publicKey, signedEK]);
+    if (!receipt){
+        console.log("Failed to call the transaction function")
+        return
+    }
+    await sleep(30000); // Wait 30 seconds for the black block 
+    let response = await sodaHelper.callContractView("onboard_user", "getSavedUserKey")
+    const encryptedKey0 = response[0];
+    const encryptedKey1 = response[1];
+    
     // Decrypt the AES key using the RSA private key
-    const buf = Buffer.from(encryptedKey.substring(2), 'hex');
-    const decryptedAESKey = decryptRSA(privateKey, buf);
+    const share0Buf = Buffer.from(encryptedKey0.substring(2), 'hex');
+    const share1Buf = Buffer.from(encryptedKey1.substring(2), 'hex');
+    const decryptedAESKey = recoverUserKey(privateKey, share0Buf, share1Buf);
 
     fs.appendFileSync('.env', `export USER_KEY='${decryptedAESKey.toString('hex')}'\n`);
+    
 }
 
 main()

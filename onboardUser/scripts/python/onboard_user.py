@@ -31,7 +31,7 @@ def main(provider_url: str):
     # Sign the public key
     signature = sign(public_key, bytes.fromhex(signing_key[2:]))
 
-    # Call the getUserKey function to get the encrypted AES key
+    # Call the getUserKey function to get the encrypted AES shares
     receipt = soda_helper.call_contract_transaction("onboard_user", "getUserKey", func_args=[public_key, signature])
     if receipt is None:
         print("Failed to call the transaction function")
@@ -40,7 +40,7 @@ def main(provider_url: str):
     sleep(30)
     encryptedKey0, encryptedKey1 = contract.functions.getSavedUserKey().call()
 
-    # Decrypt the aes key using the RSA private key
+    # Recover the aes key using the RSA private key and the given shares
     decrypted_aes_key = recover_user_key(private_key, encryptedKey0, encryptedKey1)
     
     # Write the data to a .env file
