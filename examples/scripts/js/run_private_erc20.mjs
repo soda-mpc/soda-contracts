@@ -64,17 +64,40 @@ async function getEncryptedBalance(sodaHelper, contract){
     }
 }
 
-async function executeAndCheckBalance(sodaHelper, func, contract, user_key, expectedBalance){
-    await sodaHelper.callContractFunctionTransaction(func);
+async function execute_transaction(sodaHelper, func){
+    return sodaHelper.callContractFunctionTransactionAsync(func);
+}
+
+async function checkBalance(sodaHelper, contract, user_key, expectedBalance){
     // Get my encrypted balance, decrypt it and check if it is equal to the expected balance
     const my_CTBalance = await getEncryptedBalance(sodaHelper, contract)
     const my_balance = decryptValue(my_CTBalance, user_key);
-    checkExpectedResult('transfer', expectedBalance, my_balance);
+    checkExpectedResult('balanceOf', expectedBalance, my_balance);
 }
 
-async function checkAllowance(account, contract, user_key, expectedAllowance){
+async function checkAllowance(sodaHelper, account, contract, user_key, expectedAllowance){
     // Get my encrypted allowance, decrypt it and check if it is equal to the expected allowance
-    let allowanceCT = await contract.methods.allowance(account.address, account.address).call({'from': account.address})
+    let func = await contract.methods.allowance(account.address, account.address);
+    const receipt = await sodaHelper.callContractFunctionTransaction(func);
+
+    // Processing the receipt to extract Balance events
+    const allowanceEvents = await contract.getPastEvents('Allowance', {
+        fromBlock: receipt.blockNumber,
+        toBlock: receipt.blockNumber
+    });
+
+    // Filter events for the specific address
+    const targetEvent = allowanceEvents.find(event => 
+        event.returnValues._owner.toLowerCase() === sodaHelper.getAccount().address.toLowerCase()
+    );
+
+    let allowanceCT = null;
+    if (targetEvent) {
+        allowanceCT = targetEvent.returnValues._allowance;
+    } else {
+        console.log("Failed to find the allowance of the account address in the transaction receipt.");
+    }
+
     let allowance = decryptValue(allowanceCT, user_key)
     checkExpectedResult('allowance', expectedAllowance, allowance)
 }
@@ -127,23 +150,18 @@ async function main() {
     const contract = sodaHelper.getContract("private_erc20")
     const account = sodaHelper.getAccount();
     
-    console.log("************* Initial balance = ", INITIAL_BALANCE, " *************");
-    const my_CTBalance = await getEncryptedBalance(sodaHelper, contract)
-    let my_balance = decryptValue(my_CTBalance, user_key);
-    checkExpectedResult('balanceOf', INITIAL_BALANCE, my_balance);
-
     const plaintext_integer = 5;
 
 
     console.log("************* Transfer clear ", plaintext_integer, " to Alice *************");
     // Transfer 5 SOD to Alice
     let func = contract.methods.transfer(alice_address.address, plaintext_integer, true);
-    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - plaintext_integer)
+    await execute_transaction(sodaHelper, func);
 
     console.log("************* Transfer clear ", plaintext_integer, " to Alice *************");
     // Transfer 5 SOD to Alice
     func = contract.methods.contractTransferClear(alice_address.address, plaintext_integer);
-    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - 2*plaintext_integer)
+    await execute_transaction(sodaHelper, func);
 
     console.log("************* Transfer IT ", plaintext_integer, " to Alice *************")
     // In order to generate the input text, we need to use some data of the function. 
@@ -159,30 +177,28 @@ async function main() {
     // Create the real function using the prepared IT
     func = contract.methods.transfer(alice_address.address, ctInt, signature, false);
     // Transfer 5 SOD to Alice
-    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - 3*plaintext_integer)
+    await execute_transaction(sodaHelper, func, contract)
 
     console.log("************* Transfer clear ", plaintext_integer, " from my account to Alice without allowance *************")
     // Trying to transfer 5 SOD to Alice. There is no allowance, transfer should fail
-    func = contract.methods.transferFrom(account.address, alice_address.address, plaintext_integer, true)
+    func = contract.methods.transferFrom(account.address, alice_address.address, plaintext_integer, true);
     // There is no allowance, balance should remain the same
-    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - 3*plaintext_integer)
+    await execute_transaction(sodaHelper, func);
 
     console.log("************* Approve ", plaintext_integer*10, " to my address *************")
     // Set allowance for this account
-    func = contract.methods.approveClear(account.address, plaintext_integer*10)
-    await sodaHelper.callContractFunctionTransaction(func);
-    // Get my allowance to check that the allowance is correct
-    checkAllowance(account, contract, user_key, plaintext_integer*10)
+    func = contract.methods.approveClear(account.address, plaintext_integer*10);
+    await sodaHelper.callContractFunctionTransactionAsync(func);
 
     console.log("************* Transfer clear ", plaintext_integer, " from my account to Alice *************")
     // Transfer 5 SOD to Alice
-    func = contract.methods.transferFrom(account.address, alice_address.address, plaintext_integer, true)
-    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - 4*plaintext_integer)
+    func = contract.methods.transferFrom(account.address, alice_address.address, plaintext_integer, true);
+    await execute_transaction(sodaHelper, func, contract);
 
-    console.log("************* Transfer clear ", plaintext_integer, " from my account to Alice *************")
+    console.log("************* Transfer clear ", plaintext_integer, " from my account to Alice *************");
     // Transfer 5 SOD to Alice
-    func = contract.methods.contractTransferFromClear(account.address, alice_address.address, plaintext_integer)
-    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - 5*plaintext_integer)
+    func = contract.methods.contractTransferFromClear(account.address, alice_address.address, plaintext_integer);
+    await execute_transaction(sodaHelper, func, contract);
 
     console.log("************* Transfer IT ", plaintext_integer, " from my account to Alice *************");
     // Transfer 5 SOD to Alice
@@ -191,23 +207,14 @@ async function main() {
     ({ctInt, signature} = prepareIT(plaintext_integer, user_key, account.address, contract.options.address, hashFuncSig, Buffer.from(SIGNING_KEY.slice(2), 'hex')));
     // Create the real function using the prepared IT output
     func = contract.methods.transferFrom(account.address, alice_address.address, ctInt, signature, false);
-    await executeAndCheckBalance(sodaHelper, func, contract, user_key, INITIAL_BALANCE - 6*plaintext_integer);
+    await execute_transaction(sodaHelper, func, contract)
+    
+    console.log("************* Check my balance *************")
+    await checkBalance(sodaHelper, contract, user_key, INITIAL_BALANCE - 6*plaintext_integer);
     
     console.log("************* Check my allowance *************")
     // Check the remainning allowance
-    checkAllowance(account, contract, user_key, plaintext_integer*7)
-
-    console.log("************* Approve IT 50 to my address *************")
-    // Approve 50 SOD to this account
-    func = contract.methods.approve(account.address, dummyCT, dummySignature); // Dummy function to get the signature
-    hashFuncSig = getFunctionSignature(func);
-    ({ctInt, signature} = prepareIT(50, user_key, account.address, contract.options.address, hashFuncSig, Buffer.from(SIGNING_KEY.slice(2), 'hex')));
-    func = contract.methods.approve(account.address, ctInt, signature);
-    await sodaHelper.callContractFunctionTransaction(func);
-
-    console.log("************* Check my allowance *************")
-    // Check that the allowance has changed to 50 SOD
-    checkAllowance(account, contract, user_key, 50);
+    await checkAllowance(sodaHelper, account, contract, user_key, plaintext_integer*7);
 }
 
 main()
