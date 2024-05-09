@@ -16,6 +16,8 @@ contract PrecompilesMiscellaneous1TestsContract {
     bool muxRes;
     bool onboardRes;
 
+    uint8 validateCiphertextRes;
+
     function getRandom() public view returns (uint64) {
         return random;
     }
@@ -26,6 +28,10 @@ contract PrecompilesMiscellaneous1TestsContract {
 
     function getBooleanResults() public view returns (bool, bool, bool, bool, bool, bool, bool, bool) {
         return (andRes, orRes, xorRes, notRes, eqRes, neqRes, muxRes, onboardRes);
+    }
+    
+    function getValidateCiphertextResult() public view returns (uint8) {
+        return validateCiphertextRes;
     }
 
     uint constant MAX_SIZE_8_BITS = 10; 
@@ -157,6 +163,41 @@ contract PrecompilesMiscellaneous1TestsContract {
 
         ctBool cipher = MpcCore.offBoard(aGT);
         onboardRes = MpcCore.decrypt(MpcCore.onBoard(cipher)); 
+    }
+
+    // When invoking this test function, all ciphertexts share the same value but are 
+    // cast to four different types: ctUint8, ctUint16, ctUint32, and ctUint64. 
+    // Consequently, there is a single signature covering all these ciphertexts.
+    function validateCiphertextTest(ctUint8 ct8, ctUint16 ct16, ctUint32 ct32, ctUint64 ct64, bytes calldata signature) public returns (uint8){
+        // Create ITs from ciphertext and signature
+        itUint8 memory it8;
+        it8.ciphertext = ct8;
+        it8.signature = signature;
+
+        itUint16 memory it16;
+        it16.ciphertext = ct16;
+        it16.signature = signature;
+
+        itUint32 memory it32;
+        it32.ciphertext = ct32;
+        it32.signature = signature;
+
+        itUint64 memory it64;
+        it64.ciphertext = ct64;
+        it64.signature = signature;
+
+        validateCiphertextRes = MpcCore.decrypt(MpcCore.validateCiphertext(it8));
+
+        uint16 result16 = MpcCore.decrypt(MpcCore.validateCiphertext(it16));
+        require(result16 == validateCiphertextRes, "validateCiphertextTest: validateCiphertext with 16 bits failed");
+
+        uint32 result32 = MpcCore.decrypt(MpcCore.validateCiphertext(it32));
+        require(result32 == validateCiphertextRes, "validateCiphertextTest: validateCiphertext with 32 bits failed");
+
+        uint64 result64 = MpcCore.decrypt(MpcCore.validateCiphertext(it64));
+        require(result64 == validateCiphertextRes, "validateCiphertextTest: validateCiphertext with 64 bits failed");
+
+        return validateCiphertextRes;
     }
 
 }
