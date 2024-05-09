@@ -2,9 +2,10 @@ import os
 import sys
 from time import sleep 
 sys.path.append('soda-sdk')
-from python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, decrypt_rsa, encrypt_rsa, sign, decrypt
+from python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, decrypt_rsa, encrypt_rsa, sign, decrypt, prepare_IT
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 from web3.exceptions import TransactionNotFound
+from eth_account import Account
 
 # Path to the Solidity files
 SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol',
@@ -49,70 +50,70 @@ def check_expected_result(name, expected_result, result):
 
 
 # Test functions
-def test_addition(soda_helper, contract, a, b, expected_result):
+def test_addition(soda_helper, contract, a, b):
     execute_transaction("addition", soda_helper, contract, "addTest", func_args=[a, b])
 
-def test_subtraction(soda_helper, contract, a, b, expected_result):
+def test_subtraction(soda_helper, contract, a, b):
     execute_transaction("subtraction", soda_helper, contract, "subTest", func_args=[a, b])
 
-def test_multiplication(soda_helper, contract, a, b, expected_result):
+def test_multiplication(soda_helper, contract, a, b):
     execute_transaction("multiplication", soda_helper, contract, "mulTest", func_args=[a, b])
 
-def test_division(soda_helper, contract, a, b, expected_result):
+def test_division(soda_helper, contract, a, b):
     execute_transaction("division", soda_helper, contract, "divTest", func_args=[a, b])
 
-def test_remainder(soda_helper, contract, a, b, expected_result):
+def test_remainder(soda_helper, contract, a, b):
     execute_transaction("reminder", soda_helper, contract, "remTest", func_args=[a, b])
 
-def test_bitwise_and(soda_helper, contract, a, b, expected_result):
+def test_bitwise_and(soda_helper, contract, a, b):
     execute_transaction("bitwise and", soda_helper, contract, "andTest", func_args=[a, b])
 
-def test_bitwise_or(soda_helper, contract, a, b, expected_result):
+def test_bitwise_or(soda_helper, contract, a, b):
     execute_transaction("bitwise or", soda_helper, contract, "orTest", func_args=[a, b])
 
-def test_bitwise_xor(soda_helper, contract, a, b, expected_result):
+def test_bitwise_xor(soda_helper, contract, a, b):
     execute_transaction("bitwise xor", soda_helper, contract, "xorTest", func_args=[a, b])
 
-def test_bitwise_shift_left(soda_helper, contract, a, b, expected_result8, expected_result16, expected_result32, expected_result64):
+def test_bitwise_shift_left(soda_helper, contract, a, b):
     execute_transaction("bitwise shift left", soda_helper, contract, "shlTest", func_args=[a, b])
 
-def test_bitwise_shift_right(soda_helper, contract, a, b, expected_result):
+def test_bitwise_shift_right(soda_helper, contract, a, b):
     execute_transaction("bitwise shift right", soda_helper, contract, "shrTest", func_args=[a, b])
 
-def test_min(soda_helper, contract, a, b, expected_result):
+def test_min(soda_helper, contract, a, b):
     execute_transaction("min", soda_helper, contract, "minTest", func_args=[a, b])
 
-def test_max(soda_helper, contract, a, b, expected_result):
+def test_max(soda_helper, contract, a, b):
     execute_transaction("max", soda_helper, contract, "maxTest", func_args=[a, b])
 
-def test_eq(soda_helper, contract, a, b, expected_result):
+def test_eq(soda_helper, contract, a, b):
     execute_transaction("equality", soda_helper, contract, "eqTest", func_args=[a, b])
 
-def test_ne(soda_helper, contract, a, b, expected_result):
+def test_ne(soda_helper, contract, a, b):
     execute_transaction("not equal", soda_helper, contract, "neTest", func_args=[a, b])
 
-def test_ge(soda_helper, contract, a, b, expected_result):
+def test_ge(soda_helper, contract, a, b):
     execute_transaction("greater than or equal", soda_helper, contract, "geTest", func_args=[a, b])
 
-def test_gt(soda_helper, contract, a, b, expected_result):
+def test_gt(soda_helper, contract, a, b):
     execute_transaction("greater than", soda_helper, contract, "gtTest", func_args=[a, b])
 
-def test_le(soda_helper, contract, a, b, expected_result):
+def test_le(soda_helper, contract, a, b):
     execute_transaction("less than or equal", soda_helper, contract, "leTest", func_args=[a, b])
 
-def test_lt(soda_helper, contract, a, b, expected_result):
+def test_lt(soda_helper, contract, a, b):
     execute_transaction("less than", soda_helper, contract, "ltTest", func_args=[a, b])
 
-def test_mux(soda_helper, contract, selectionBit, a, b, expected_result):
+def test_mux(soda_helper, contract, selectionBit, a, b):
     execute_transaction("mux", soda_helper, contract, "muxTest", func_args=[selectionBit, a, b])
 
-def test_transfer(soda_helper, contract, a, b, amount, expected_result_a, expected_result_b):
+def test_transfer(soda_helper, contract, a, b, amount):
     execute_transaction("transfer", soda_helper, contract, "transferTest", func_args=[a, b, amount])
 
-def test_offboardOnboard(soda_helper, contract, a, expected_result):
+def test_offboardOnboard(soda_helper, contract, a):
     execute_transaction("offboard_Onboard", soda_helper, contract, "offboardOnboardTest", func_args=[a, a, a, a])
 
-def test_not(soda_helper, contract, bit, expected_result):
+def test_not(soda_helper, contract, bit):
     execute_transaction("not", soda_helper, contract, "notTest", func_args=[bit])
     
  
@@ -131,7 +132,7 @@ def checkCt(ct, decrypted_aes_key, expected_result):
     x = int.from_bytes(decrypted_message, 'big')
     check_expected_result("userKey", expected_result, x)
 
-def test_getUserKey(soda_helper, contract, a, expected_result, public_key):
+def test_getUserKey(soda_helper, contract, a, public_key):
     signing_key = os.environ.get('SIGNING_KEY')
     signedEK = sign(public_key, bytes.fromhex(signing_key[2:]))
     execute_transaction("get user key", soda_helper, contract, "userKeyTest", func_args=[public_key, signedEK])
@@ -149,6 +150,32 @@ def test_randomBoundedBits(soda_helper, contract, numBits):
 
 def test_boolean(soda_helper, contract, bool_a, bool_b, bit):
     execute_transaction("boolean tests", soda_helper, contract, "booleanTest", func_args=[bool_a, bool_b, bit])
+
+def get_function_signature(function_abi):
+    # Extract the input types from the ABI
+    input_types = ','.join([param['type'] for param in function_abi.get('inputs', [])])
+
+    # Generate the function signature
+    return f"{function_abi['name']}({input_types})"
+
+def test_validate_ciphertext(soda_helper, contract_str, a):
+    user_key_hex = os.environ.get('USER_KEY')
+    user_aes_key = bytes.fromhex(user_key_hex)  
+    sign_key = os.environ.get('SIGNING_KEY')
+    
+    # In order to generate the input text, we need to use some data of the function. 
+    # For example, the address of the user, the address of the contract and also the function signature.
+    # To simplify the process of obtaining the function signature, we use a dummy function with placeholder inputs.
+    # After the signature is generated, we call prepare input text function and get the input text to use in the real function.
+    dummyCT = 0
+    dummySignature = bytes(65)
+    contract = soda_helper.get_contract(contract_str)
+    function = contract.functions.validateCiphertextTest(dummyCT, dummyCT, dummyCT, dummyCT, dummySignature)
+    func_sig = get_function_signature(function.abi) # Get the function signature
+    # Prepare the input text for the function
+    ct, signature = prepare_IT(a, user_aes_key, Account.from_key(sign_key), contract, func_sig, bytes.fromhex(sign_key[2:]))
+    execute_transaction("validate ciphertext", soda_helper, contract_str, "validateCiphertextTest", func_args=[ct, ct, ct, ct, signature])
+
 
 def checkResults(soda_helper, expected_results, private_key):
     result = soda_helper.call_contract_view('PrecompilesArythmeticTestsContract.sol', "getAddResult")
@@ -266,68 +293,72 @@ def checkResults(soda_helper, expected_results, private_key):
     else:
         raise ValueError(f'Test RandomBoundedBits failed.')
 
+    result = soda_helper.call_contract_view('PrecompilesMiscellaneous1TestsContract.sol', "getValidateCiphertextResult")
+    check_expected_result("validate_ciphertext", expected_results["validate_ciphertext"], result)
+
 # Main test function
 def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b):
     expected_results = {}
 
     # Test Addition
     print("Run addition test...")
-    test_addition(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b, a + b)
+    test_addition(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b)
     expected_results["addition"] = a+b
     
     # Test Subtraction
     print("Run subtraction test...")
-    test_subtraction(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b, a - b)
+    test_subtraction(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b)
     expected_results["subtract"] = a-b
 
     # Test Multiplication
     print("Run multiplication test...")
-    test_multiplication(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b, a * b)
+    test_multiplication(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b)
     expected_results["multiplication"] = a*b
 
     # Test Division
     print("Run division test...")
-    test_division(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', a, b, a / b)
+    test_division(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', a, b)
     expected_results["division"] = a/b
 
     # Test Remainder
     print("Run remainder test...")
-    test_remainder(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', a, b, a % b)
+    test_remainder(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', a, b)
     expected_results["reminder"] = a%b
 
     # Test Mux
     print("Run mux test...")
-    test_mux(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', bit, a, b, a if bit == 0 else b)
+    test_mux(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', bit, a, b)
     expected_results["mux"] = a if bit == 0 else b
 
     # Test Offboard_Onboard
     print("Run offboard_Onboard test...")
-    test_offboardOnboard(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', a, a)
+    test_offboardOnboard(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', a)
     expected_results["onboard_offboard"] = a
 
     # test Not
     print("Run not test...")
-    test_not(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', bit, not bit)
+    test_not(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', bit)
     expected_results["not"] = not bit
 
     # Test Bitwise AND
     print("Run and test...")
-    test_bitwise_and(soda_helper, 'PrecompilesBitwiseTestsContract.sol', a, b, a & b)
+    test_bitwise_and(soda_helper, 'PrecompilesBitwiseTestsContract.sol', a, b)
     expected_results["and"] = a & b
 
     # Test Bitwise OR
     print("Run or test...")
-    test_bitwise_or(soda_helper, 'PrecompilesBitwiseTestsContract.sol', a, b, a | b)
+    test_bitwise_or(soda_helper, 'PrecompilesBitwiseTestsContract.sol', a, b)
     expected_results["or"] = a | b
 
     # Test Bitwise XOR
     print("Run xor test...")
-    test_bitwise_xor(soda_helper, 'PrecompilesBitwiseTestsContract.sol', a, b, a ^ b)
+    test_bitwise_xor(soda_helper, 'PrecompilesBitwiseTestsContract.sol', a, b)
     expected_results["xor"] = a ^ b
 
     # Test Bitwise Shift Left
     print("Run shift left test...")
-    test_bitwise_shift_left(soda_helper, 'PrecompilesShiftTestsContract.sol', a, shift, (a << shift) & 0xFF, (a << shift) & 0xFFFF, (a << shift) & 0xFFFFFFFF, (a << shift) & 0xFFFFFFFFFFFFFFFF) # Calculate the result in 8, 16, 32, and 64 bit
+    test_bitwise_shift_left(soda_helper, 'PrecompilesShiftTestsContract.sol', a, shift) 
+    # Calculate the result in 8, 16, 32, and 64 bit
     expected_results["shift_left8"] = (a << shift) & 0xFF
     expected_results["shift_left16"] = (a << shift) & 0xFFFF
     expected_results["shift_left32"] = (a << shift) & 0xFFFFFFFF
@@ -335,58 +366,58 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b):
 
     # Test Bitwise Shift Right
     print("Run shift right test...")
-    test_bitwise_shift_right(soda_helper, 'PrecompilesShiftTestsContract.sol', a, shift, a >> shift)
+    test_bitwise_shift_right(soda_helper, 'PrecompilesShiftTestsContract.sol', a, shift)
     expected_results["shift_right"] = a >> shift
 
     # Test Min
     print("Run min test...")
-    test_min(soda_helper, 'PrecompilesMinMaxTestsContract.sol', a, b, min(a, b))
+    test_min(soda_helper, 'PrecompilesMinMaxTestsContract.sol', a, b)
     expected_results["min"] = min(a, b)
 
     # Test Max
     print("Run max test...")
-    test_max(soda_helper, 'PrecompilesMinMaxTestsContract.sol', a, b, max(a, b))
+    test_max(soda_helper, 'PrecompilesMinMaxTestsContract.sol', a, b)
     expected_results["max"] = max(a, b)
 
     # Test Equality
     print("Run equality test...")
-    test_eq(soda_helper, 'PrecompilesComparison2TestsContract.sol', a, b, a == b)
+    test_eq(soda_helper, 'PrecompilesComparison2TestsContract.sol', a, b)
     expected_results["eq"] = (a == b)
 
     # Test Not Equal
     print("Run not equal test...")
-    test_ne(soda_helper, 'PrecompilesComparison2TestsContract.sol', a, b, a != b)
+    test_ne(soda_helper, 'PrecompilesComparison2TestsContract.sol', a, b)
     expected_results["ne"] = (a != b)
 
     # Test Greater Than or Equal
     print("Run greater than or equal test...")
-    test_ge(soda_helper, 'PrecompilesComparison2TestsContract.sol', a, b, a >= b)
+    test_ge(soda_helper, 'PrecompilesComparison2TestsContract.sol', a, b)
     expected_results["ge"] = (a >= b)
 
     # Test Greater Than
     print("Run greater than test...")
-    test_gt(soda_helper, 'PrecompilesComparison1TestsContract.sol', a, b, a > b)
+    test_gt(soda_helper, 'PrecompilesComparison1TestsContract.sol', a, b)
     expected_results["gt"] = (a > b)
 
     # Test Less Than or Equal
     print("Run less than or equal test...")
-    test_le(soda_helper, 'PrecompilesComparison1TestsContract.sol', a, b, a <= b)
+    test_le(soda_helper, 'PrecompilesComparison1TestsContract.sol', a, b)
     expected_results["le"] = (a <= b)
 
     # Test Less Than
     print("Run less than test...")
-    test_lt(soda_helper, 'PrecompilesComparison1TestsContract.sol', a, b, a < b)
+    test_lt(soda_helper, 'PrecompilesComparison1TestsContract.sol', a, b)
     expected_results["lt"] = (a < b)
 
     # Test Transfer
     print("Run transfer test...")
-    test_transfer(soda_helper, 'PrecompilesTransferTestsContract.sol', a, b, b, a - b, b + b)
+    test_transfer(soda_helper, 'PrecompilesTransferTestsContract.sol', a, b, b)
     expected_results["transfer_a"] = a - b
     expected_results["transfer_b"] = b + b
     
     # Test Transfer scalar
     print("Run transfer scalar test...")
-    test_transfer(soda_helper, 'PrecompilesTransferScalarTestsContract.sol', a, b, b, a - b, b + b)
+    test_transfer(soda_helper, 'PrecompilesTransferScalarTestsContract.sol', a, b, b)
 
     # Test boolean functions
     print("Run Boolean functions test...")
@@ -403,8 +434,13 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b):
     # Test getUserKey
     print("Run get user key test...")
     private_key, public_key = generate_rsa_keypair()
-    test_getUserKey(soda_helper, 'PrecompilesOffboardToUserKeyTestContract.sol', a, a, public_key)
+    test_getUserKey(soda_helper, 'PrecompilesOffboardToUserKeyTestContract.sol', a, public_key)
     expected_results["offboard_user"] = a
+
+    # Test Validate Ciphertext
+    print("Run validate ciphertext test...")
+    test_validate_ciphertext(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', a)
+    expected_results["validate_ciphertext"] = a
 
     # test random
     print("Run random test...")
