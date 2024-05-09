@@ -89,6 +89,10 @@ library MpcCore {
         return (share0, share1);
     }
 
+    function deleteUserKey(bytes calldata signature) internal{
+        ExtendedOperations(address(MPC_PRECOMPILE)).DeleteUserKey(signature);
+    }
+
     
 
 // =========== 1 bit operations ==============

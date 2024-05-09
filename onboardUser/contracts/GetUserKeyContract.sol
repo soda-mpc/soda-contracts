@@ -19,4 +19,8 @@ contract GetUserKeyContract {
         return (keyShare0, keyShare1);
     }
 
+    function deleteUserKey(bytes calldata signature) public {
+        MpcCore.deleteUserKey(signature);
+    }
+
 }
