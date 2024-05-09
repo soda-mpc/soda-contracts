@@ -176,7 +176,7 @@ def test_validate_ciphertext(soda_helper, contract_str, a):
     execute_transaction("validate ciphertext", soda_helper, contract_str, "validateCiphertextTest", func_args=[ct, ct, ct, ct, signature])
 
 def checkResults(soda_helper, expected_results, private_key):
-    sleep(30)
+    sleep(40)
     result = soda_helper.call_contract_view('PrecompilesArythmeticTestsContract.sol', "getAddResult")
     check_expected_result("addition", expected_results["addition"], result)
 
