@@ -11,7 +11,9 @@ interface ExtendedOperations {
     function RandBoundedBits(bytes1 metaData, uint8 numBits) external returns (uint256 result);
 
     function Add(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 result);
+    function CheckedAdd(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 overflowBit, uint256 result);
     function Sub(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 result);
+    function CheckedSub(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 overflowBit, uint256 result);
     function Mul(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 result);
     function Div(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 result);
     function Rem(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 result);

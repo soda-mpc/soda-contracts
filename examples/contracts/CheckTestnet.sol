@@ -53,7 +53,10 @@ contract CheckTestnet {
         b = MpcCore.max(20, b); // b = 20
 
         ctUint32 ct = MpcCore.offBoard(b);
-        a = MpcCore.onBoard(ct); // 20
+        a = MpcCore.onBoard(ct); // a = 20
+
+        a = MpcCore.checkedAdd(a, b); // a = 40
+
 
         gtok = MpcCore.eq(b , 20); // gtok = true
         gtok = MpcCore.ne(b , 20); // gtok = false
@@ -63,6 +66,7 @@ contract CheckTestnet {
         gtok = MpcCore.lt(b , 20); // gtok = false
 
         userCt = MpcCore.offBoardToUser(b, addr);
+
         output = MpcCore.decrypt(a);
         
         ok = MpcCore.decrypt(gtok);

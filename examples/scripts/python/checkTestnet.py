@@ -54,7 +54,7 @@ def main():
     print("Function call result:", output)
 
 
-    sleep(10)
+    sleep(20)
 
     # Get the output
     output = contract.functions.getOutput().call({'from': account.address})

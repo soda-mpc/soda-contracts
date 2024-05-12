@@ -18,7 +18,8 @@ SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol',
                   'PrecompilesMinMaxTestsContract.sol', 
                   'PrecompilesShiftTestsContract.sol', 
                   'PrecompilesComparison1TestsContract.sol',
-                  'PrecompilesOffboardToUserKeyTestContract.sol']
+                  'PrecompilesOffboardToUserKeyTestContract.sol',
+                  'PrecompilesCheckedFuncsTestsContract.sol']
 
 def setup(provider_url: str):
     signing_key = os.environ.get('SIGNING_KEY')
@@ -52,8 +53,14 @@ def check_expected_result(name, expected_result, result):
 def test_addition(soda_helper, contract, a, b):
     execute_transaction("addition", soda_helper, contract, "addTest", func_args=[a, b])
 
+def test_checked_addition(soda_helper, contract, a, b):
+    execute_transaction("checked addition", soda_helper, contract, "checkedAddTest", func_args=[a, b])
+
 def test_subtraction(soda_helper, contract, a, b):
     execute_transaction("subtraction", soda_helper, contract, "subTest", func_args=[a, b])
+
+def test_checked_subtraction(soda_helper, contract, a, b):
+    execute_transaction("checked subtraction", soda_helper, contract, "checkedSubTest", func_args=[a, b])
 
 def test_multiplication(soda_helper, contract, a, b):
     execute_transaction("multiplication", soda_helper, contract, "mulTest", func_args=[a, b])
@@ -180,8 +187,14 @@ def checkResults(soda_helper, expected_results, private_key):
     result = soda_helper.call_contract_view('PrecompilesArythmeticTestsContract.sol', "getAddResult")
     check_expected_result("addition", expected_results["addition"], result)
 
+    result = soda_helper.call_contract_view('PrecompilesCheckedFuncsTestsContract.sol', "getAddResult")
+    check_expected_result("checked_addition", expected_results["checked_addition"], result)
+
     result = soda_helper.call_contract_view('PrecompilesArythmeticTestsContract.sol', "getSubResult")
     check_expected_result("subtract", expected_results["subtract"], result)
+
+    result = soda_helper.call_contract_view('PrecompilesCheckedFuncsTestsContract.sol', "getSubResult")
+    check_expected_result("checked_subtract", expected_results["checked_subtract"], result)
 
     result = soda_helper.call_contract_view('PrecompilesArythmeticTestsContract.sol', "getResult16")
     check_expected_result("multiplication", expected_results["multiplication"], result)
@@ -303,11 +316,21 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b):
     print("Run addition test...")
     test_addition(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b)
     expected_results["addition"] = a+b
+
+    # Test Checked Addition
+    print("Run checked addition test...")
+    test_checked_addition(soda_helper, 'PrecompilesCheckedFuncsTestsContract.sol', a, b)
+    expected_results["checked_addition"] = a+b
     
     # Test Subtraction
     print("Run subtraction test...")
     test_subtraction(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b)
     expected_results["subtract"] = a-b
+
+    # Test Checked Subtraction
+    print("Run checked subtraction test...")
+    test_checked_subtraction(soda_helper, 'PrecompilesCheckedFuncsTestsContract.sol', a, b)
+    expected_results["checked_subtract"] = a-b
 
     # Test Multiplication
     print("Run multiplication test...")
@@ -472,6 +495,7 @@ def runTestVectors(soda_helper):
 
     #  test vector 1
     run_tests(soda_helper, 100, 50, 10, True, 8, False, False)
+
 
 def main(provider_url: str):
     print("Running tests...")
