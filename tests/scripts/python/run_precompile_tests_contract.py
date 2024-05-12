@@ -183,7 +183,7 @@ def test_validate_ciphertext(soda_helper, contract_str, a):
     execute_transaction("validate ciphertext", soda_helper, contract_str, "validateCiphertextTest", func_args=[ct, ct, ct, ct, signature])
 
 def checkResults(soda_helper, expected_results, private_key):
-    sleep(40)
+    sleep(60)
     result = soda_helper.call_contract_view('PrecompilesArythmeticTestsContract.sol', "getAddResult")
     check_expected_result("addition", expected_results["addition"], result)
 
@@ -208,7 +208,7 @@ def checkResults(soda_helper, expected_results, private_key):
     result = soda_helper.call_contract_view('PrecompilesMiscellaneousTestsContract.sol', "getMuxResult")
     check_expected_result("mux", expected_results["mux"], result)
 
-    result = soda_helper.call_contract_view('PrecompilesMiscellaneousTestsContract.sol', "getOnboardOffboardResult")
+    result = soda_helper.call_contract_view('PrecompilesOffboardToUserKeyTestContract.sol', "getOnboardOffboardResult")
     check_expected_result("onboard_offboard", expected_results["onboard_offboard"], result)
 
     result = soda_helper.call_contract_view('PrecompilesMiscellaneousTestsContract.sol', "getBoolResult")
@@ -354,7 +354,7 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b):
 
     # Test Offboard_Onboard
     print("Run offboard_Onboard test...")
-    test_offboardOnboard(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', a)
+    test_offboardOnboard(soda_helper, 'PrecompilesOffboardToUserKeyTestContract.sol', a)
     expected_results["onboard_offboard"] = a
 
     # test Not

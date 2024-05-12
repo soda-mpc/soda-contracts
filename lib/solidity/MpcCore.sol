@@ -951,6 +951,11 @@ library MpcCore {
             Max(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), uint256(a), gtUint8.unwrap(b)));
     }
 
+    function mux(gtBool bit, uint8 a, gtUint8 b) internal returns (gtUint8){
+         return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtBool.unwrap(bit), uint256(a), gtUint8.unwrap(b)));
+    }
+
 
  // =========== 16 bit operations ==============
 
@@ -1056,6 +1061,11 @@ library MpcCore {
     function max(uint16 a, gtUint16 b) internal returns (gtUint16) {
         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Max(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), uint256(a), gtUint16.unwrap(b)));
+    }
+
+    function mux(gtBool bit, uint16 a, gtUint16 b) internal returns (gtUint16){
+         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtBool.unwrap(bit), uint256(a), gtUint16.unwrap(b)));
     }
 
 
@@ -1165,6 +1175,11 @@ library MpcCore {
             Max(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), uint256(a), gtUint32.unwrap(b)));
     }
 
+    function mux(gtBool bit, uint32 a, gtUint32 b) internal returns (gtUint32){
+         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtBool.unwrap(bit), uint256(a), gtUint32.unwrap(b)));
+    }
+
 
 // =========== 64 bit operations ==============
 
@@ -1270,6 +1285,11 @@ library MpcCore {
     function max(uint64 a, gtUint64 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Max(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), uint256(a), gtUint64.unwrap(b)));
+    }
+
+    function mux(gtBool bit, uint64 a, gtUint64 b) internal returns (gtUint64){
+         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtBool.unwrap(bit), uint256(a), gtUint64.unwrap(b)));
     }
 
     
@@ -1380,6 +1400,11 @@ library MpcCore {
             Max(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint8.unwrap(a), uint256(b)));
     }
 
+    function mux(gtBool bit, gtUint8 a, uint8 b) internal returns (gtUint8){
+         return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtBool.unwrap(bit), gtUint8.unwrap(a), uint256(b)));
+    }
+
  // =========== 16 bit operations ==============
 
     function add(gtUint16 a, uint16 b) internal returns (gtUint16) {
@@ -1484,6 +1509,11 @@ library MpcCore {
     function max(gtUint16 a, uint16 b) internal returns (gtUint16) {
         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Max(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.RHS_PUBLIC), gtUint16.unwrap(a), uint256(b)));
+    }
+
+    function mux(gtBool bit, gtUint16 a, uint16 b) internal returns (gtUint16){
+         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.RHS_PUBLIC), gtBool.unwrap(bit), gtUint16.unwrap(a), uint256(b)));
     }
 
 
@@ -1592,7 +1622,11 @@ library MpcCore {
             Max(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.RHS_PUBLIC), gtUint32.unwrap(a), uint256(b)));
     }
 
-
+    function mux(gtBool bit, gtUint32 a, uint32 b) internal returns (gtUint32){
+         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.RHS_PUBLIC), gtBool.unwrap(bit), gtUint32.unwrap(a), uint256(b)));
+    }
+    
 
 // =========== 64 bit operations ==============
 
@@ -1698,6 +1732,11 @@ library MpcCore {
     function max(gtUint64 a, uint64 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Max(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b)));
+    }
+
+    function mux(gtBool bit, gtUint64 a, uint64 b) internal returns (gtUint64){
+         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtBool.unwrap(bit), gtUint64.unwrap(a), uint256(b)));
     }
 
     // In the context of a transfer, scalar balances are irrelevant;

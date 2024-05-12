@@ -54,7 +54,6 @@ contract PrecompilesMiscellaneousTestsContract {
     uint8 divResult;
     uint8 remResult;
     uint8 muxResult;
-    uint8 onboardOffboardResult;
     bool boolResult;
 
     function getDivResult() public view returns (uint8) {
@@ -66,10 +65,7 @@ contract PrecompilesMiscellaneousTestsContract {
     function getMuxResult() public view returns (uint8) {
         return muxResult;
     }
-    function getOnboardOffboardResult() public view returns (uint8) {
-        return onboardOffboardResult;
-    }
-
+    
     function getBoolResult() public view returns (bool) {
         return boolResult;
     }
@@ -250,32 +246,17 @@ contract PrecompilesMiscellaneousTestsContract {
         uint64 res64 = decryptAndCompareResults64(check64);
         require(result == res64, "muxTest: cast 64 failed");
 
+        // Check the result with scalar
+        require(result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, a, castingValues.b8_s)) && result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, castingValues.a8_s, b)),
+                "muxTest: test 8 bits with scalar failed");
+        require(result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, a, castingValues.b16_s)) && result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, castingValues.a16_s, b)),
+                "muxTest: test 16 bits with scalar failed");
+        require(result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, a, castingValues.b32_s)) && result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, castingValues.a32_s, b)),
+                "muxTest: test 32 bits with scalar failed");
+        require(result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, a, castingValues.b64_s)) && result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, castingValues.a64_s, b)),
+                "muxTest: test 64 bits with scalar failed");
+
         return result; 
-    }
-
-    function offboardOnboardTest(uint8 a8, uint16 a16, uint32 a32, uint32 a64) public returns (uint8) {
-        gtUint8 a8_s = MpcCore.setPublic8(a8);
-        gtUint16 a16_s = MpcCore.setPublic16(a16);
-        gtUint32 a32_s = MpcCore.setPublic32(a32);
-        gtUint64 a64_s = MpcCore.setPublic64(a64);
-
-        ctUint8 cipher8 = MpcCore.offBoard(a8_s);
-        uint8 result = MpcCore.decrypt(MpcCore.onBoard(cipher8)); 
-        onboardOffboardResult = result;
-
-        ctUint16 cipher16 = MpcCore.offBoard(a16_s);
-        uint16 result16 = MpcCore.decrypt(MpcCore.onBoard(cipher16)); 
-
-        ctUint32 cipher32 = MpcCore.offBoard(a32_s);
-        uint32 result32 = MpcCore.decrypt(MpcCore.onBoard(cipher32)); 
-
-        ctUint64 cipher64 = MpcCore.offBoard(a64_s);
-        uint64 result64 = MpcCore.decrypt(MpcCore.onBoard(cipher64));
-
-        require(result == result16 && result == result32 && result == result64, 
-                "Failed to offboard and onboard all values");
-
-        return result;
     }
 
     function notTest(bool a) public returns (bool) {
