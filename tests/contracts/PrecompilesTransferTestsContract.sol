@@ -33,7 +33,7 @@ contract PrecompilesTransferTestsContract {
     }
     
 
-    function computeAndChekTransfer16(AllGTCastingValues memory allGTCastingValues, AllAmountValues memory allAmountValues, uint8 new_a, uint8 new_b, bool res) public {
+    function computeAndCheckTransfer16(AllGTCastingValues memory allGTCastingValues, AllAmountValues memory allAmountValues, uint8 new_a, uint8 new_b, bool res) public {
         (gtUint16 newA_s, gtUint16 newB_s, gtBool res_s) = MpcCore.transfer(allGTCastingValues.a16_s, allGTCastingValues.b16_s, allAmountValues.amount8_s);
         require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 16 failed");
 
@@ -53,7 +53,7 @@ contract PrecompilesTransferTestsContract {
         require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 16 failed");
     }
 
-    function computeAndChekTransfer32(AllGTCastingValues memory allGTCastingValues, AllAmountValues memory allAmountValues, uint8 new_a, uint8 new_b, bool res) public {
+    function computeAndCheckTransfer32(AllGTCastingValues memory allGTCastingValues, AllAmountValues memory allAmountValues, uint8 new_a, uint8 new_b, bool res) public {
 
         // Check all options for casting to 32 while amount is 32
         (gtUint32 newA_s, gtUint32 newB_s, gtBool res_s) = MpcCore.transfer(allGTCastingValues.a32_s, allGTCastingValues.b32_s, allAmountValues.amount32_s);
@@ -105,7 +105,7 @@ contract PrecompilesTransferTestsContract {
         require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 32 failed");
     }
 
-    function computeAndChekTransfer64(AllGTCastingValues memory allGTCastingValues, AllAmountValues memory allAmountValues, uint8 new_a, uint8 new_b, bool res) public {
+    function computeAndCheckTransfer64(AllGTCastingValues memory allGTCastingValues, AllAmountValues memory allAmountValues, uint8 new_a, uint8 new_b, bool res) public {
 
         // Check all options for casting to 64 while amount is 64
         (gtUint64 newA_s, gtUint64 newB_s, gtBool res_s) = MpcCore.transfer(allGTCastingValues.a64_s, allGTCastingValues.b64_s, allAmountValues.amount64_s);
@@ -223,13 +223,13 @@ contract PrecompilesTransferTestsContract {
         result = MpcCore.decrypt(res_s);
 
         // Calculate the result with casting to 16
-        computeAndChekTransfer16(allGTCastingValues, allAmountValues, newA, newB, result);
+        computeAndCheckTransfer16(allGTCastingValues, allAmountValues, newA, newB, result);
 
         // Calculate the result with casting to 32
-        computeAndChekTransfer32(allGTCastingValues, allAmountValues, newA, newB, result);
+        computeAndCheckTransfer32(allGTCastingValues, allAmountValues, newA, newB, result);
 
         // Calculate the result with casting to 64
-        computeAndChekTransfer64(allGTCastingValues, allAmountValues, newA, newB, result);
+        computeAndCheckTransfer64(allGTCastingValues, allAmountValues, newA, newB, result);
     
         return (newA, newB, result); 
     }

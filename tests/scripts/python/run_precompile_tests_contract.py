@@ -14,6 +14,8 @@ SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol',
                   'PrecompilesMiscellaneousTestsContract.sol',
                   'PrecompilesMiscellaneous1TestsContract.sol',
                   'PrecompilesTransferTestsContract.sol', 
+                  'PrecompilesTransferAllowanceTestsContract.sol', 
+                  'PrecompilesTransferAllowanceScalarTestsContract.sol', 
                   'PrecompilesTransferScalarTestsContract.sol', 
                   'PrecompilesMinMaxTestsContract.sol', 
                   'PrecompilesShiftTestsContract.sol', 
@@ -115,6 +117,9 @@ def test_mux(soda_helper, contract, selectionBit, a, b):
 
 def test_transfer(soda_helper, contract, a, b, amount):
     execute_transaction("transfer", soda_helper, contract, "transferTest", func_args=[a, b, amount])
+
+def test_transfer_allowance(soda_helper, contract, a, b, amount, allowance):
+    return execute_transaction("transfer with allowance", soda_helper, contract, "transferWithAllowanceTest", func_args=[a, b, amount, allowance])
 
 def test_offboardOnboard(soda_helper, contract, a):
     execute_transaction("offboard_Onboard", soda_helper, contract, "offboardOnboardTest", func_args=[a, a, a, a])
@@ -265,10 +270,26 @@ def checkResults(soda_helper, expected_results, private_key):
     
     new_a, new_b, res = soda_helper.call_contract_view('PrecompilesTransferScalarTestsContract.sol', "getResults")
     if not res:
-        print(f'Test transfer Failed.')
+        print(f'Test transfer failed.')
     
     check_expected_result("transfer scalar", expected_results["transfer_a"], new_a)
     check_expected_result("transfer scalar", expected_results["transfer_b"], new_b)
+
+    new_a, new_b, res, allowance = soda_helper.call_contract_view('PrecompilesTransferAllowanceTestsContract.sol', "getResults")
+    if not res:
+        print(f'Test transfer with allowance failed.')
+    
+    check_expected_result("transfer_allowance", expected_results["transfer_a"], new_a)
+    check_expected_result("transfer_allowance", expected_results["transfer_b"], new_b)
+    check_expected_result("transfer_allowance", expected_results["transfer_allowance"], allowance)
+
+    new_a, new_b, res, allowance = soda_helper.call_contract_view('PrecompilesTransferAllowanceTestsContract.sol', "getResults")
+    if not res:
+        print(f'Test transfer with allowance failed.')
+    
+    check_expected_result("transfer_allowance_scalar", expected_results["transfer_a"], new_a)
+    check_expected_result("transfer_allowance_scalar", expected_results["transfer_b"], new_b)
+    check_expected_result("transfer_allowance_scalar", expected_results["transfer_allowance"], allowance)
 
     andRes, orRes, xorRes, notRes, eqRes, neqRes, muxRes, onboardRes = soda_helper.call_contract_view('PrecompilesMiscellaneous1TestsContract.sol', "getBooleanResults")
     check_expected_result("boolean_and", expected_results["boolean_and"], andRes)
@@ -309,7 +330,7 @@ def checkResults(soda_helper, expected_results, private_key):
     check_expected_result("validate_ciphertext", expected_results["validate_ciphertext"], result)
 
 # Main test function
-def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b):
+def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance):
     expected_results = {}
 
     # Test Addition
@@ -441,6 +462,15 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b):
     print("Run transfer scalar test...")
     test_transfer(soda_helper, 'PrecompilesTransferScalarTestsContract.sol', a, b, b)
 
+    # Test Transfer with allowance
+    print("Run transfer with allowance test...")
+    tx_hash = test_transfer_allowance(soda_helper, 'PrecompilesTransferAllowanceTestsContract.sol', a, b, b, allowance)
+    expected_results["transfer_allowance"] = allowance - b
+
+    # Test Transfer with allowance scalar
+    print("Run transfer with allowance scalar test...")
+    test_transfer_allowance(soda_helper, 'PrecompilesTransferAllowanceScalarTestsContract.sol', a, b, b, allowance)
+
     # Test boolean functions
     print("Run Boolean functions test...")
     tx_hash = test_boolean(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', bool_a, bool_b, bit)
@@ -489,12 +519,12 @@ def runTestVectors(soda_helper):
     print(f'\nTest Vector 0\n')
 
     #  test vector 0
-    run_tests(soda_helper, 10, 5, 2, False, 7, True, False)
+    run_tests(soda_helper, 10, 5, 2, False, 7, True, False, 7)
 
     print(f'\nTest Vector 1\n')
 
     #  test vector 1
-    run_tests(soda_helper, 100, 50, 10, True, 8, False, False)
+    run_tests(soda_helper, 100, 50, 10, True, 8, False, False, 80)
 
 
 def main(provider_url: str):
