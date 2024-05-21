@@ -1,7 +1,6 @@
 import os
 from eth_account import Account
 import sys
-from time import sleep
 sys.path.append('soda-sdk')
 from python.crypto import decrypt, prepare_IT, block_size
 from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL
@@ -53,8 +52,6 @@ def main():
     output = contract.functions.getUserCt().call({'from': account.address})
     print("Function call result:", output)
 
-
-    sleep(20)
 
     # Get the output
     output = contract.functions.getOutput().call({'from': account.address})

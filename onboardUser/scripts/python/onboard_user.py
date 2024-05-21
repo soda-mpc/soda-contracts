@@ -37,7 +37,6 @@ def main(provider_url: str):
         print("Failed to call the transaction function")
         return
 
-    sleep(30)
     encryptedKey0, encryptedKey1 = contract.functions.getSavedUserKey().call()
 
     # Recover the aes key using the RSA private key and the given shares

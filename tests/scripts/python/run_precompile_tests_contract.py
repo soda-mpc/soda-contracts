@@ -188,7 +188,7 @@ def test_validate_ciphertext(soda_helper, contract_str, a):
     execute_transaction("validate ciphertext", soda_helper, contract_str, "validateCiphertextTest", func_args=[ct, ct, ct, ct, signature])
 
 def checkResults(soda_helper, expected_results, private_key):
-    sleep(60)
+    
     result = soda_helper.call_contract_view('PrecompilesArythmeticTestsContract.sol', "getAddResult")
     check_expected_result("addition", expected_results["addition"], result)
 
@@ -464,7 +464,7 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
 
     # Test Transfer with allowance
     print("Run transfer with allowance test...")
-    tx_hash = test_transfer_allowance(soda_helper, 'PrecompilesTransferAllowanceTestsContract.sol', a, b, b, allowance)
+    test_transfer_allowance(soda_helper, 'PrecompilesTransferAllowanceTestsContract.sol', a, b, b, allowance)
     expected_results["transfer_allowance"] = allowance - b
 
     # Test Transfer with allowance scalar
@@ -473,7 +473,7 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
 
     # Test boolean functions
     print("Run Boolean functions test...")
-    tx_hash = test_boolean(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', bool_a, bool_b, bit)
+    test_boolean(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', bool_a, bool_b, bit)
     expected_results["boolean_and"] = bool_a and bool_b
     expected_results["boolean_or"] = bool_a or bool_b
     expected_results["boolean_xor"] = bool_a ^ bool_b
@@ -501,6 +501,7 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
     # test random bounded bits
     print("Run random Bounded Bits test...")
     tx_hash = test_randomBoundedBits(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', numBits)
+    print(f'last transaction hash: {tx_hash.hex()}')
 
     soda_helper.init_async_tx()
     

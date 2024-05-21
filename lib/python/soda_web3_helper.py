@@ -8,10 +8,10 @@ from solcx import compile_standard, install_solc, get_installed_solc_versions
 import argparse
 from time import sleep
 
-LOCAL_PROVIDER_URL = 'http://localhost:7000'
+LOCAL_PROVIDER_URL = 'http://localhost:7001'
 REMOTE_HTTP_PROVIDER_URL = 'https://node.sodalabs.net' 
 SOLC_VERSION = '0.8.19'
-DEFAULT_GAS_PRICE = 10
+DEFAULT_GAS_PRICE = 30
 DEFAULT_GAS_LIMIT = 10000000
 DEFAULT_CHAIN_ID = 50505050
 async_tx = 0
@@ -294,7 +294,7 @@ class SodaWeb3Helper:
             'to': to_address,
             'value': self.web3.to_wei(amount, 'ether'),
             'gas': gas_limit,
-            'gasPrice': gas_price,
+            'gasPrice': self.web3.to_wei(gas_price, 'gwei'),
             'nonce': self.web3.eth.get_transaction_count(account.address),
             'chainId': chain_id
         }
@@ -320,7 +320,7 @@ class SodaWeb3Helper:
             'chainId': chain_id,
             'nonce': self.web3.eth.get_transaction_count(account.address) + async_tx,
             'gas': gas,
-            'gasPrice': self.web3.to_wei(gas_price, 'wei')
+            'gasPrice': self.web3.to_wei(gas_price, 'gwei')
         })  
     
     def _build_function_transaction(self, func, gas, gas_price, chain_id, account=None):
@@ -332,7 +332,7 @@ class SodaWeb3Helper:
             'chainId': chain_id,
             'nonce': self.web3.eth.get_transaction_count(account.address) + async_tx,
             'gas': gas,
-            'gasPrice': self.web3.to_wei(gas_price, 'wei')
+            'gasPrice': self.web3.to_wei(gas_price, 'gwei')
         })  
     
     def _sign_and_send_transaction(self, transaction, account, is_async=False):
