@@ -45,11 +45,13 @@ jobs:
           python -m onboardUser.scripts.python.transfer_native_coins ${{ secrets.SECRET_KEY }} Remote
           chmod +x onboardUser/scripts/js/onboard_user.mjs 
           node onboardUser/scripts/js/onboard_user.mjs Remote
+        timeout-minutes: 5
     
       - name: Run js ERC20
         run: |
           source .env
           node examples/scripts/js/run_private_erc20.mjs Remote
+        timeout-minutes: 5
 
       - name: Onboard user - python
         run: |
@@ -60,16 +62,19 @@ jobs:
           python -m onboardUser.scripts.python.transfer_native_coins ${{ secrets.SECRET_KEY }} Remote
           chmod +x onboardUser/scripts/python/onboard_user.py
           python -m onboardUser.scripts.python.onboard_user Remote
+        timeout-minutes: 5
 
       - name: Run tests
         run: |
           source .env
           python -m tests.scripts.python.run_precompile_tests_contract Remote
+        timeout-minutes: 5
 
       - name: Run python ERC20
         run: |
           source .env
           python -m examples.scripts.python.run_private_erc20 Remote
+        timeout-minutes: 5
   
       - name: Check Exit Codes
         run: |
