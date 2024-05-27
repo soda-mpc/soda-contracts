@@ -35,6 +35,8 @@ async function main() {
     const signedEK = sign(publicKey, Buffer.from(SIGNING_KEY.slice(2), 'hex'));
     
     // Call the getUserKey function to get the encrypted AES key
+    const estimatedGas = await sodaHelper.estimateGas("onboard_user", "getUserKey", [publicKey, signedEK]);
+    console.log("Estimated gas required:", estimatedGas);
     await sodaHelper.callContractTransaction("onboard_user", "getUserKey", [publicKey, signedEK]);
     const encryptedKey = await sodaHelper.callContractView("onboard_user", "getSavedUserKey")
 

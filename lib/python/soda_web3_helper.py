@@ -14,7 +14,6 @@ SOLC_VERSION = '0.8.19'
 DEFAULT_GAS_PRICE = 30
 DEFAULT_GAS_LIMIT = 10000000
 DEFAULT_CHAIN_ID = 50505050
-async_tx = 0
 
 def parse_url_parameter():
     parser = argparse.ArgumentParser(description='Get URL')
@@ -119,21 +118,19 @@ class SodaWeb3Helper:
             account = self.account
         
         tx_hashes = []
-        global async_tx
-        
+        nonce = self.web3.eth.get_transaction_count(account.address)
+
         for contract_id in contracts_id:
             func_to_call = self.contracts[contract_id].constructor
-            construct_txn = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, constructor_args, account)
+            construct_txn = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, constructor_args, account, nonce)
             tx_hashes.append(self._sign_and_send_transaction(construct_txn, account, is_async=True))
-            async_tx += 2 # When deploying a contract, two contracts are actually being deployed. So the nonce needs to be incremented by two for the next contract deployment.
+            nonce += 2 # When deploying a contract, two contracts are actually being deployed. So the nonce needs to be incremented by two for the next contract deployment.
 
         if any([h is None for h in tx_hashes]):
             raise Exception("Failed to deploy contracts.")
 
-        async_tx = 0
-
         tx_receipts = [None]*len(tx_hashes)
-        print(f"Wait for transaction receipts: {tx_hashes}")
+        print(f"Wait for transaction receipts...")
                     
         # Wait for transaction receipts for all contracts hashes
         while not all(tx_receipts):
@@ -162,6 +159,12 @@ class SodaWeb3Helper:
         contract = self.contracts[contract_id]
         func = getattr(contract.functions, func_name)
         return func(*func_args).call()
+
+    def get_current_nonce(self, account=None):
+        if account is None:
+            account = self.account
+            
+        return self.web3.eth.get_transaction_count(account.address)
     
     def call_contract_transaction(self, 
                                   contract_id, 
@@ -183,9 +186,31 @@ class SodaWeb3Helper:
         
         return self._sign_and_send_transaction(transaction, account)
 
+    def estimate_gas(self, 
+                    contract_id, 
+                    func_name, 
+                    func_args=[], 
+                    account=None):
+        if account is None:
+            account = self.account
+
+        if contract_id not in self.contracts:
+            print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
+            return None
+
+        try:
+            func_to_call = getattr(self.contracts[contract_id].functions, func_name)  
+            return func_to_call(*func_args).estimate_gas({
+                'from': account.address,
+            })  
+        except Exception as e:
+            print(f"Error estimating gas: {e}")
+            return None     
+
     def call_contract_transaction_async(self, 
                                   contract_id, 
                                   func_name, 
+                                  nonce,
                                   gas_limit=DEFAULT_GAS_LIMIT, 
                                   gas_price=DEFAULT_GAS_PRICE, 
                                   chain_id=DEFAULT_CHAIN_ID, 
@@ -198,17 +223,10 @@ class SodaWeb3Helper:
             print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
             return None
 
-        global async_tx
         func_to_call = getattr(self.contracts[contract_id].functions, func_name)
-        transaction = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, func_args, account)
-
-        async_tx += 1
+        transaction = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, func_args, account, nonce)
         
         return self._sign_and_send_transaction(transaction, account, is_async=True)
-
-    def init_async_tx(self):
-        global async_tx
-        async_tx = 0
 
     def call_contract_function_transaction(self, 
                                   contract_id, 
@@ -225,14 +243,13 @@ class SodaWeb3Helper:
             return None
         
         transaction = self._build_function_transaction(func, gas_limit, gas_price, chain_id, account)
-        global async_tx
-        async_tx = 0
         
         return self._sign_and_send_transaction(transaction, account)
 
     def call_contract_function_transaction_async(self, 
                                   contract_id, 
                                   func, 
+                                  nonce,
                                   gas_limit=DEFAULT_GAS_LIMIT, 
                                   gas_price=DEFAULT_GAS_PRICE, 
                                   chain_id=DEFAULT_CHAIN_ID, 
@@ -244,11 +261,8 @@ class SodaWeb3Helper:
             print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
             return None
         
-        transaction = self._build_function_transaction(func, gas_limit, gas_price, chain_id, account)
+        transaction = self._build_function_transaction(func, gas_limit, gas_price, chain_id, account, nonce)
 
-        global async_tx
-        async_tx += 1
-        
         return self._sign_and_send_transaction(transaction, account, is_async=True)
     
     def generate_random_account(self):
@@ -283,7 +297,7 @@ class SodaWeb3Helper:
             'to': to_address,
             'value': self.web3.to_wei(amount, 'ether'),
             'gas': gas_limit,
-            'gasPrice': self.web3.to_wei(gas_price, 'gwei'),
+            'gasPrice': self.web3.to_wei(gas_price, 'wei'),
             'nonce': self.web3.eth.get_transaction_count(account.address),
             'chainId': chain_id
         }
@@ -298,26 +312,32 @@ class SodaWeb3Helper:
     def wei_to_sod(self, amount):
         return self.web3.from_wei(amount, 'ether')
     
-    def _build_transaction(self, func, gas_limit, gas_price, chain_id, tx_args=[], account=None):
+    def _build_transaction(self, func, gas_limit, gas_price, chain_id, tx_args=[], account=None, nonce=None):
         if account is None:
             account = self.account
+
+        if nonce is None:
+            nonce = self.web3.eth.get_transaction_count(account.address)
 
         return func(*tx_args).build_transaction({
             'from': account.address,
             'chainId': chain_id,
-            'nonce': self.web3.eth.get_transaction_count(account.address) + async_tx,
+            'nonce': nonce,
             'gas': gas_limit,
             'gasPrice': self.web3.to_wei(gas_price, 'wei')
         })  
     
-    def _build_function_transaction(self, func, gas_limit, gas_price, chain_id, account=None):
+    def _build_function_transaction(self, func, gas_limit, gas_price, chain_id, account=None, nonce=None):
         if account is None:
             account = self.account
+
+        if nonce is None:
+            nonce = self.web3.eth.get_transaction_count(account.address)
 
         return func.build_transaction({
             'from': account.address,
             'chainId': chain_id,
-            'nonce': self.web3.eth.get_transaction_count(account.address) + async_tx,
+            'nonce': nonce,
             'gas': gas_limit,
             'gasPrice': self.web3.to_wei(gas_price, 'wei')
         })  

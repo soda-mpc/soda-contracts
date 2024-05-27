@@ -56,7 +56,7 @@ library MpcCore {
         return bytes4(uint32(mpcType1) << 24 | uint24(mpcType2) << 16 | uint16(mpcType3) << 8 | uint8(argsType));
     }
 
-    function getUserKey(bytes calldata signedEK, bytes calldata signature) internal view returns (bytes memory encryptedKey) {
+    function getUserKey(bytes calldata signedEK, bytes calldata signature) internal returns (bytes memory encryptedKey) {
         // Combine array from signedEK and signature
         bytes memory combined = new bytes(signature.length + signedEK.length);
 
