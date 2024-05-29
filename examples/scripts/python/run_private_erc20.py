@@ -10,6 +10,7 @@ from time import sleep
 FILE_NAME = 'PrivateERC20Contract.sol'
 FILE_PATH = 'examples/contracts/'
 INITIAL_BALANCE = 500000000
+NONCE = 0
 
 def decrypt_value(my_CTBalance, user_key):
     
@@ -51,7 +52,10 @@ def get_encrypted_balance(soda_helper, account, contract):
     return None
 
 def execute_transaction(soda_helper, account, contract, function):
-    return soda_helper.call_contract_function_transaction_async("private_erc20", function)
+    global NONCE
+    tx_hash = soda_helper.call_contract_function_transaction_async("private_erc20", function, NONCE)
+    NONCE += 1
+    return tx_hash
 
 def check_balance(soda_helper, account, contract, user_key, name, expected_balance):
     
@@ -105,7 +109,9 @@ def main(provider_url: str):
         print("Failed to deploy the contract")
 
     contract = soda_helper.get_contract("private_erc20")
-    
+
+    global NONCE
+    NONCE = soda_helper.get_current_nonce()
 
     print("************* View functions *************")
     name = contract.functions.name().call({'from': account.address})
@@ -162,7 +168,8 @@ def main(provider_url: str):
     print("************* Approve ", plaintext_integer*10, " to my address *************")
     # Set allowance for this account
     function = contract.functions.approveClear(account.address, plaintext_integer*10)
-    soda_helper.call_contract_function_transaction_async("private_erc20", function)
+    soda_helper.call_contract_function_transaction_async("private_erc20", function, NONCE)
+    NONCE += 1
 
     print("************* Transfer clear ", plaintext_integer, " from my account to Alice *************")
     # Transfer 5 SOD to Alice
@@ -182,7 +189,15 @@ def main(provider_url: str):
     ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]))
     # Create the real function using the prepared IT
     function = contract.functions.transferFrom(account.address, alice_address.address, ct, signature, False)
-    execute_transaction(soda_helper, account, contract, function)
+    tx_hash = execute_transaction(soda_helper, account, contract, function)
+
+    tx_receipt = None
+    while tx_receipt is None:
+        try:
+            tx_receipt = soda_helper.web3.eth.get_transaction_receipt(tx_hash.hex())
+        except TransactionNotFound as e:
+            pass
+        sleep(1)
 
     print("************* Check my balance *************")
     check_balance(soda_helper, account, contract, user_key, 'balanceOf', INITIAL_BALANCE - 6*plaintext_integer)

@@ -5,6 +5,7 @@ import {SodaWeb3Helper, parseURLParameter} from '../../../lib/js/sodaWeb3Helper.
 const FILE_NAME = 'PrivateERC20Contract.sol';
 const FILE_PATH = 'examples/contracts/';
 const INITIAL_BALANCE = 500000000
+let nonce;
 
 function checkExpectedResult(name, expectedResult, result) {
     if (result === expectedResult) {
@@ -65,7 +66,9 @@ async function getEncryptedBalance(sodaHelper, contract){
 }
 
 async function execute_transaction(sodaHelper, func){
-    return sodaHelper.callContractFunctionTransactionAsync(func);
+    const tx_hash = sodaHelper.callContractFunctionTransactionAsync(func, nonce);
+    nonce++;
+    return tx_hash;
 }
 
 async function checkBalance(sodaHelper, contract, user_key, expectedBalance){
@@ -113,7 +116,7 @@ async function main() {
     const SIGNING_KEY = process.env.SIGNING_KEY;
     // Create helper function using the private key
     const sodaHelper = new SodaWeb3Helper(SIGNING_KEY, provider_url);
-
+    
     // compile the onboard solidity contract
     const success = sodaHelper.setupContract(FILE_PATH, FILE_NAME, "private_erc20");
     if (!success){
@@ -152,6 +155,8 @@ async function main() {
     
     const plaintext_integer = 5;
 
+    nonce = await sodaHelper.getCurrentNonce();
+
 
     console.log("************* Transfer clear ", plaintext_integer, " to Alice *************");
     // Transfer 5 SOD to Alice
@@ -188,7 +193,8 @@ async function main() {
     console.log("************* Approve ", plaintext_integer*10, " to my address *************")
     // Set allowance for this account
     func = contract.methods.approveClear(account.address, plaintext_integer*10);
-    await sodaHelper.callContractFunctionTransactionAsync(func);
+    await sodaHelper.callContractFunctionTransactionAsync(func, nonce);
+    nonce++;
 
     console.log("************* Transfer clear ", plaintext_integer, " from my account to Alice *************")
     // Transfer 5 SOD to Alice
@@ -207,7 +213,9 @@ async function main() {
     ({ctInt, signature} = prepareIT(plaintext_integer, user_key, account.address, contract.options.address, hashFuncSig, Buffer.from(SIGNING_KEY.slice(2), 'hex')));
     // Create the real function using the prepared IT output
     func = contract.methods.transferFrom(account.address, alice_address.address, ctInt, signature, false);
-    await execute_transaction(sodaHelper, func, contract)
+    const tx_hash = await execute_transaction(sodaHelper, func, contract)
+
+    await sodaHelper.waitForTransactionReceipt(tx_hash);
     
     console.log("************* Check my balance *************")
     await checkBalance(sodaHelper, contract, user_key, INITIAL_BALANCE - 6*plaintext_integer);
