@@ -5,8 +5,27 @@ import {SodaWeb3Helper, parseURLParameter} from '../../../lib/js/sodaWeb3Helper.
 const FILE_NAME = 'GetUserKeyContract.sol';
 const FILE_PATH = 'onboardUser/contracts/';
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+async function getUserKeyShares(account, contract, receipt) {
+    // Processing the receipt to extract Balance events
+    const userKeyEvents = await contract.getPastEvents('UserKey', {
+        fromBlock: receipt.blockNumber,
+        toBlock: receipt.blockNumber
+    });
+
+    // Filter events for the specific address
+    const targetEvent = userKeyEvents.find(event => 
+        event.returnValues._owner.toLowerCase() === account.address.toLowerCase()
+    );
+
+    let keyShare0 = null;
+    let keyShare1 = null;
+    if (targetEvent) {
+        keyShare0 = targetEvent.returnValues._keyShare0;
+        keyShare1 = targetEvent.returnValues._keyShare1;
+    } else {
+        console.log("Failed to find the key shares of the account address in the transaction receipt.");
+    }
+    return [keyShare0, keyShare1];
 }
 
 async function main() {
@@ -44,8 +63,7 @@ async function main() {
         console.log("Failed to call the transaction function")
         return
     }
-    await sleep(30000); // Wait 30 seconds for the black block 
-    let response = await sodaHelper.callContractView("onboard_user", "getSavedUserKey")
+    let response = await getUserKeyShares(sodaHelper.getAccount(), sodaHelper.getContract("onboard_user"), receipt);
     const encryptedKey0 = response[0];
     const encryptedKey1 = response[1];
     

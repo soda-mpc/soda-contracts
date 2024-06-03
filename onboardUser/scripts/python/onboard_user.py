@@ -8,6 +8,22 @@ from time import sleep
 FILE_NAME = 'GetUserKeyContract.sol'
 FILE_PATH = 'onboardUser/contracts/'
 
+def getUserKeyShares(account, contract, receipt):
+    user_key_events = contract.events.UserKey().process_receipt(receipt)
+
+    key_0_share = None
+    key_1_share = None
+    # Filter events for the specific address
+    for event in user_key_events:
+        if event['args']['_owner'].lower() == account.address.lower():
+            key_0_share = event['args']['_keyShare0']
+            key_1_share = event['args']['_keyShare1']
+    
+    if key_0_share is None or key_1_share is None:
+        print("Failed to find the key shares of the account address in the transaction receipt.")
+
+    return key_0_share, key_1_share
+
 def main(provider_url: str):
 
     signing_key = os.environ.get('SIGNING_KEY')
@@ -37,7 +53,7 @@ def main(provider_url: str):
         print("Failed to call the transaction function")
         return
 
-    encryptedKey0, encryptedKey1 = contract.functions.getSavedUserKey().call()
+    encryptedKey0, encryptedKey1 = getUserKeyShares(soda_helper.get_account(), contract, receipt)
 
     # Recover the aes key using the RSA private key and the given shares
     decrypted_aes_key = recover_user_key(private_key, encryptedKey0, encryptedKey1)
