@@ -6,7 +6,8 @@ import "MpcCore.sol";
 contract GetUserKeyContract {
 
     event UserKey(address indexed _owner, bytes _keyShare0, bytes _keyShare1);
-    
+    event DeleteKey(address indexed _owner);
+
     function getUserKey(bytes calldata signedEK, bytes calldata signature) public returns (bytes memory, bytes memory) {
         bytes memory keyShare0;
         bytes memory keyShare1;
@@ -18,6 +19,7 @@ contract GetUserKeyContract {
 
     function deleteUserKey(bytes calldata signature) public {
         MpcCore.deleteUserKey(signature);
+        emit DeleteKey(msg.sender);
     }
 
 }

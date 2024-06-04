@@ -1,7 +1,7 @@
 import os
 import sys
 sys.path.append('soda-sdk')
-from python.crypto import sign, prepare_delete_key_signature
+from python.crypto import prepare_delete_key_signature
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 from time import sleep
 from eth_account import Account
