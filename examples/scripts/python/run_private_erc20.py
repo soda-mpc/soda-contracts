@@ -2,8 +2,8 @@ import os
 from eth_account import Account
 import sys
 sys.path.append('soda-sdk')
-from python.crypto import decrypt, prepare_IT, block_size
-from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
+from python.crypto import prepare_IT
+from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter, decrypt_value_int, get_function_signature
 from web3.exceptions import TransactionNotFound
 from time import sleep
 
@@ -12,30 +12,6 @@ FILE_PATH = 'examples/contracts/'
 INITIAL_BALANCE = 500000000
 NONCE = 0
 
-def decrypt_value(my_CTBalance, user_key):
-    
-    # Convert ct to bytes (big-endian)
-    byte_array = my_CTBalance.to_bytes(32, byteorder='big')
-
-    # Split ct into two 128-bit arrays r and cipher
-    cipher = byte_array[:block_size]
-    r = byte_array[block_size:]
-
-    # Decrypt the cipher
-    decrypted_message = decrypt(user_key, r, cipher)
-
-    # Print the decrypted cipher
-    decrypted_balance = int.from_bytes(decrypted_message, 'big')
-
-    return decrypted_balance
-    
-
-def get_function_signature(function_abi):
-    # Extract the input types from the ABI
-    input_types = ','.join([param['type'] for param in function_abi.get('inputs', [])])
-
-    # Generate the function signature
-    return f"{function_abi['name']}({input_types})"
 
 def get_encrypted_balance(soda_helper, account, contract):
     function = contract.functions.balanceOf()
@@ -51,6 +27,7 @@ def get_encrypted_balance(soda_helper, account, contract):
     print("Failed to find balance of the account address in the transaction receipt.")
     return None
 
+
 def execute_transaction(soda_helper, account, contract, function):
     gas_estimate = function.estimate_gas({
         'from': account.address,
@@ -61,12 +38,14 @@ def execute_transaction(soda_helper, account, contract, function):
     NONCE += 1
     return hash
 
+
 def check_balance(soda_helper, account, contract, user_key, name, expected_balance):
     
     # Get my encrypted balance, decrypt it and check if it matches the expected value
     my_CTBalance = get_encrypted_balance(soda_helper, account, contract)
-    my_balance = decrypt_value(my_CTBalance, user_key)
+    my_balance = decrypt_value_int(my_CTBalance, user_key)
     check_expected_result(name, expected_balance, my_balance)
+
 
 def check_allowance(soda_helper, account, contract, user_key, expected_allowance):
     # Get my encrypted allowance, decrypt it and check if it matches the expected value
@@ -86,14 +65,16 @@ def check_allowance(soda_helper, account, contract, user_key, expected_allowance
     if allowanceCT is None:
         print("Failed to find the allowance of the account address in the transaction receipt.")
 
-    allowance = decrypt_value(allowanceCT, user_key)
+    allowance = decrypt_value_int(allowanceCT, user_key)
     check_expected_result('allowance', expected_allowance, allowance)
+
 
 def check_expected_result(name, expected_result, result):
     if result == expected_result:
         print(f'Test {name} succeeded: {result}')
     else:
         raise ValueError(f'Test {name} failed. Expected: {expected_result}, Actual: {result}')
+
 
 def main(provider_url: str):
     # Get the account private key from the environment variable
@@ -210,9 +191,7 @@ def main(provider_url: str):
     check_allowance(soda_helper, account, contract, user_key, plaintext_integer*7)
 
 
-
-
 if __name__ == "__main__":
     url = parse_url_parameter()
-    if (url is not None):
+    if url is not None:
         main(url)

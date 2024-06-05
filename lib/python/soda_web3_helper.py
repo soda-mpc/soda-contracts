@@ -1,5 +1,7 @@
 import os
 import json
+import sys
+
 from web3.middleware import geth_poa_middleware
 from eth_account import Account
 from web3 import Web3
@@ -7,13 +9,18 @@ from web3.exceptions import TransactionNotFound
 from solcx import compile_standard, install_solc, get_installed_solc_versions
 import argparse
 from time import sleep
+sys.path.append('soda-sdk')
+from python.crypto import block_size, decrypt
 
-LOCAL_PROVIDER_URL = 'http://localhost:7000'
+LOCAL_PROVIDER_PORT = os.environ.get('LOCAL_PROVIDER_PORT', '7000')
+
+LOCAL_PROVIDER_URL = f'http://localhost:{LOCAL_PROVIDER_PORT}'
 REMOTE_HTTP_PROVIDER_URL = 'https://node.sodalabs.net' 
 SOLC_VERSION = '0.8.19'
 DEFAULT_GAS_PRICE = 30
 DEFAULT_GAS_LIMIT = 10000000
 DEFAULT_CHAIN_ID = 50505050
+
 
 def parse_url_parameter():
     parser = argparse.ArgumentParser(description='Get URL')
@@ -26,6 +33,53 @@ def parse_url_parameter():
     else:
         print("Invalid provider url")
         return None
+
+
+def decrypt_value_int(encrypted_value, user_key):
+
+    # Convert ct to bytes (big-endian)
+    byte_array = encrypted_value.to_bytes(32, byteorder='big')
+
+    # Split ct into two 128-bit arrays r and cipher
+    cipher = byte_array[:block_size]
+    r = byte_array[block_size:]
+
+    # Decrypt the cipher
+    decrypted_val_bytes = decrypt(user_key, r, cipher)
+    decrypted_val = int.from_bytes(decrypted_val_bytes, 'big')
+    return decrypted_val
+
+
+def get_function_signature(function_abi):
+    # Extract the input types from the ABI
+    input_types = ','.join([param['type'] for param in function_abi.get('inputs', [])])
+
+    # Generate the function signature
+    return f"{function_abi['name']}({input_types})"
+
+
+def execute_transaction(soda_helper, account, contract_id, function):
+    gas_estimate = function.estimate_gas({
+        'from': account.address,
+    })
+    print(f'Executing <{function.fn_name}> Estimated Gas: {gas_estimate}')
+    nonce = soda_helper.web3.eth.get_transaction_count(account.address)
+    tx_hash = soda_helper.call_contract_function_transaction_async(contract_id, function, nonce,
+                                                                   is_async=False)
+    return tx_hash
+
+
+def extract_event_value(contract, receipt, filter_func, target_attribute):
+    value_events = contract.events.Identifier().process_receipt(receipt)
+
+    # Filter events using the provided filter function
+    value_encrypted = None
+    for event in value_events:
+        if filter_func(event):
+            value_encrypted = event['args'][target_attribute]
+
+    return value_encrypted
+
 
 class SodaWeb3Helper:
     def __init__(self, private_key_string, http_provider_url):
@@ -69,7 +123,6 @@ class SodaWeb3Helper:
     def get_account(self):
         return self.account
 
-    
     def deploy_contract(self, 
                         contract_id, 
                         gas_limit=DEFAULT_GAS_LIMIT, 
@@ -253,7 +306,8 @@ class SodaWeb3Helper:
                                   gas_limit=DEFAULT_GAS_LIMIT, 
                                   gas_price=DEFAULT_GAS_PRICE, 
                                   chain_id=DEFAULT_CHAIN_ID, 
-                                  account=None):
+                                  account=None,
+                                  is_async=True):
         if account is None:
             account = self.account
         
@@ -263,7 +317,7 @@ class SodaWeb3Helper:
         
         transaction = self._build_function_transaction(func, gas_limit, gas_price, chain_id, account, nonce)
 
-        return self._sign_and_send_transaction(transaction, account, is_async=True)
+        return self._sign_and_send_transaction(transaction, account, is_async=is_async)
     
     def generate_random_account(self):
         return Account.create()
@@ -284,7 +338,8 @@ class SodaWeb3Helper:
                                  gas_limit=21000, 
                                  gas_price=DEFAULT_GAS_PRICE, 
                                  chain_id=DEFAULT_CHAIN_ID,
-                                 account=None):
+                                 account=None,
+                                 is_async=True):
 
         if account is None:
             account = self.account
@@ -301,7 +356,7 @@ class SodaWeb3Helper:
             'nonce': self.web3.eth.get_transaction_count(account.address),
             'chainId': chain_id
         }
-        return self._sign_and_send_transaction(transaction, account)
+        return self._sign_and_send_transaction(transaction, account, is_async=is_async)
     
     def convert_sod_to_wei(self, amount):
         return self.web3.to_wei(amount, 'ether')

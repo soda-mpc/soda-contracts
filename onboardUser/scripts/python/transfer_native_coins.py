@@ -4,6 +4,7 @@ from eth_account import Account
 from lib.python.soda_web3_helper import SodaWeb3Helper, DEFAULT_GAS_PRICE, LOCAL_PROVIDER_URL, REMOTE_HTTP_PROVIDER_URL
 import argparse
 
+
 def transfer_to_account(sender_account_key, receiver_account, provider_url):
     soda_helper = SodaWeb3Helper(sender_account_key, provider_url)
     sender_balance = soda_helper.get_native_currency_balance(soda_helper.account.address)
@@ -11,7 +12,7 @@ def transfer_to_account(sender_account_key, receiver_account, provider_url):
     if sender_balance is None:
         print("Failed to get the balance of the account")
     amount_to_transfer = 1  # in SOD, an ether-like unit
-    receipt = soda_helper.transfer_native_currency(receiver_account.address, amount_to_transfer)
+    soda_helper.transfer_native_currency(receiver_account.address, amount_to_transfer, is_async=False)
     # We check the balance of the accounts after the transfer is complete
     receiver_balance = soda_helper.get_native_currency_balance(receiver_account.address)
     assert receiver_balance == original_receiver_balance + soda_helper.convert_sod_to_wei(amount_to_transfer)

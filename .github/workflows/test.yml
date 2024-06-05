@@ -75,7 +75,13 @@ jobs:
           source .env
           python -m examples.scripts.python.run_private_erc20 Remote
         timeout-minutes: 5
-  
+
+      - name: Run python ConfidentialIdentityRegistry
+        run: |
+          source .env
+          python -m examples.scripts.python.run_confidential_identity_registry Remote
+        timeout-minutes: 5
+
       - name: Check Exit Codes
         run: |
           if [ ${{ job.status }} == "success" ]; then
