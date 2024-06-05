@@ -1,4 +1,4 @@
-import json
+import logging
 import os
 from eth_account import Account
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
@@ -47,8 +47,7 @@ def getUserKey(signing_key, soda_helper, contract):
     # Call the getUserKey function to get the encrypted AES shares
     receipt = soda_helper.call_contract_transaction("onboard_user", "getUserKey", func_args=[public_key, signature])
     if receipt is None:
-        print("Failed to call the transaction function")
-        return
+        raise Exception("Failed to call the transaction function")
 
     encryptedKey0, encryptedKey1 = getUserKeyShares(soda_helper.get_account(), contract, receipt)
 
@@ -72,8 +71,7 @@ def deleteKey(signing_key, soda_helper, contract, account):
     # Call the deleteUserKey function to delete the encrypted AES shares
     receipt = soda_helper.call_contract_transaction("onboard_user", "deleteUserKey", func_args=[signature])
     if receipt is None:
-        print("Failed to call the transaction function")
-        return
+        raise Exception("Failed to call the transaction function")
 
 def main(provider_url: str):
 
@@ -85,12 +83,12 @@ def main(provider_url: str):
     # Compile the contract
     success = soda_helper.setup_contract(FILE_PATH + FILE_NAME, "onboard_user")
     if not success:
-        print("Failed to set up the contract")
+        raise Exception("Failed to set up the contract")
 
     # Deploy the contract
     receipt = soda_helper.deploy_contract("onboard_user", constructor_args=[])
     if receipt is None:
-        print("Failed to deploy the contract")
+        raise Exception("Failed to deploy the contract")
 
     contract = soda_helper.get_contract("onboard_user")
     
@@ -103,7 +101,7 @@ def main(provider_url: str):
     if user_key1 == user_key2:
         print(f'Test user key succeeded: Got 2 equal keys')
     else:
-        raise ValueError(f'Test user key failed. Got different values: {user_key1} and {user_key2}')
+        raise Exception(f'Test user key failed. Got different values: {user_key1} and {user_key2}')
 
     # Delete user key
     deleteKey(signing_key, soda_helper, contract, account)
@@ -123,5 +121,8 @@ def main(provider_url: str):
 if __name__ == "__main__":
     url = parse_url_parameter()
     if (url is not None):
-        main(url)
-
+        try:
+            main(url)
+        except Exception as e:
+            logging.error("An error occurred: %s", e)
+            

@@ -3,9 +3,23 @@ import sys
 sys.path.append('soda-sdk')
 from python.crypto import generate_rsa_keypair, sign, recover_user_key
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
+import logging
 
 FILE_NAME = 'GetUserKeyContract.sol'
 FILE_PATH = 'onboardUser/contracts/'
+
+def remove_user_key_from_file(filename):
+    # Read the content of the file
+    with open(filename, 'r') as file:
+        all_lines = file.readlines()
+
+    # Filter out the lines containing "USER_KEY"
+    temp_lines = list(filter(lambda line: "USER_KEY" not in line, all_lines))
+
+    # Write the modified content back to the same file
+    with open(filename, 'w') as file:
+        for line in temp_lines:
+            file.write(line)
 
 def getUserKeyShares(account, contract, receipt):
     user_key_events = contract.events.UserKey().process_receipt(receipt)
@@ -19,7 +33,7 @@ def getUserKeyShares(account, contract, receipt):
             key_1_share = event['args']['_keyShare1']
     
     if key_0_share is None or key_1_share is None:
-        print("Failed to find the key shares of the account address in the transaction receipt.")
+        raise Exception("Failed to find the key shares of the account address in the transaction receipt.")
 
     return key_0_share, key_1_share
 
@@ -32,12 +46,12 @@ def main(provider_url: str):
     # Compile the contract
     success = soda_helper.setup_contract(FILE_PATH + FILE_NAME, "onboard_user")
     if not success:
-        print("Failed to set up the contract")
+        raise Exception("Failed to set up the contract")
 
     # Deploy the contract
     receipt = soda_helper.deploy_contract("onboard_user", constructor_args=[])
     if receipt is None:
-        print("Failed to deploy the contract")
+        raise Exception("Failed to deploy the contract")
 
     contract = soda_helper.get_contract("onboard_user")
     
@@ -49,14 +63,16 @@ def main(provider_url: str):
     # Call the getUserKey function to get the encrypted AES shares
     receipt = soda_helper.call_contract_transaction("onboard_user", "getUserKey", func_args=[public_key, signature])
     if receipt is None:
-        print("Failed to call the transaction function")
-        return
+        raise Exception("Failed to call the transaction function")
 
     encryptedKey0, encryptedKey1 = getUserKeyShares(soda_helper.get_account(), contract, receipt)
 
     # Recover the aes key using the RSA private key and the given shares
     decrypted_aes_key = recover_user_key(private_key, encryptedKey0, encryptedKey1)
     
+    # Remove the old USER_KEY from the .env file
+    remove_user_key_from_file('.env')
+
     # Write the data to a .env file
     with open('.env', 'a') as f:
         f.write(f"export USER_KEY='{decrypted_aes_key.hex()}'\n")
@@ -65,5 +81,8 @@ def main(provider_url: str):
 if __name__ == "__main__":
     url = parse_url_parameter()
     if (url is not None):
-        main(url)
+        try:
+            main(url)
+        except Exception as e:
+            logging.error("An error occurred: %s", e)
     

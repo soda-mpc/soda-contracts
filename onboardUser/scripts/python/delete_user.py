@@ -4,20 +4,20 @@ sys.path.append('soda-sdk')
 from python.crypto import prepare_delete_key_signature
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 from eth_account import Account
+import logging
 
 FILE_NAME = 'GetUserKeyContract.sol'
 FILE_PATH = 'onboardUser/contracts/'
 
 def remove_user_key_from_file(filename):
-    # Temporary list to hold lines that do not contain "USER_KEY"
-    temp_lines = []
-
-    # Read the original file and filter out the line containing "USER_KEY"
+    # Read the content of the file
     with open(filename, 'r') as file:
-        for line in file:
-            if "USER_KEY" not in line:
-                temp_lines.append(line)
+        all_lines = file.readlines()
 
+    # Filter out the lines containing "USER_KEY"
+    temp_lines = list(filter(lambda line: "USER_KEY" not in line, all_lines))
+
+    # Now temp_lines contains only the lines without "USER_KEY"
     # Write the modified content back to the same file
     with open(filename, 'w') as file:
         for line in temp_lines:
@@ -39,12 +39,12 @@ def main(provider_url: str):
     # Compile the contract
     success = soda_helper.setup_contract(FILE_PATH + FILE_NAME, "onboard_user")
     if not success:
-        print("Failed to set up the contract")
+        raise Exception("Failed to set up the contract")
 
     # Deploy the contract
     receipt = soda_helper.deploy_contract("onboard_user", constructor_args=[])
     if receipt is None:
-        print("Failed to deploy the contract")
+        raise Exception("Failed to deploy the contract")
 
     contract = soda_helper.get_contract("onboard_user")
 
@@ -67,13 +67,15 @@ def main(provider_url: str):
     # Call the deleteUserKey function to delete the encrypted AES shares
     receipt = soda_helper.call_contract_transaction("onboard_user", "deleteUserKey", func_args=[signature])
     if receipt is None:
-        print("Failed to call the transaction function")
-        return
+        raise Exception("Failed to call the transaction function")
     
     remove_user_key_from_file('.env')
 
 if __name__ == "__main__":
     url = parse_url_parameter()
     if (url is not None):
-        main(url)
+        try:
+            main(url)
+        except Exception as e:
+            logging.error("An error occurred: %s", e)
     

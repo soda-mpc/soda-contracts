@@ -6,6 +6,7 @@ from python.crypto import decrypt, prepare_IT, block_size
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 from web3.exceptions import TransactionNotFound
 from time import sleep
+import logging
 
 FILE_NAME = 'PrivateERC20Contract.sol'
 FILE_PATH = 'examples/contracts/'
@@ -41,14 +42,14 @@ def get_encrypted_balance(soda_helper, account, contract):
     function = contract.functions.balanceOf()
     receipt = soda_helper.call_contract_function_transaction("private_erc20", function)
     if receipt is None:
-        print("Failed to call the transaction function")
+        raise Exception("Failed to call the transaction function")
     balance_events = contract.events.Balance().process_receipt(receipt)
     # Filter events for the specific address
     for event in balance_events:
         if event['args']['_owner'].lower() == account.address.lower():
             return event['args']['_balance']
     
-    print("Failed to find balance of the account address in the transaction receipt.")
+    raise Exception("Failed to find balance of the account address in the transaction receipt.")
     return None
 
 def execute_transaction(soda_helper, account, contract, function):
@@ -69,7 +70,7 @@ def check_allowance(soda_helper, account, contract, user_key, expected_allowance
     function = contract.functions.allowance(account.address, account.address)
     receipt = soda_helper.call_contract_function_transaction("private_erc20", function)
     if receipt is None:
-        print("Failed to call the transaction function")
+        raise Exception("Failed to call the transaction function")
 
     allowance_events = contract.events.Allowance().process_receipt(receipt)
 
@@ -80,7 +81,7 @@ def check_allowance(soda_helper, account, contract, user_key, expected_allowance
             allowanceCT = event['args']['_allowance']
     
     if allowanceCT is None:
-        print("Failed to find the allowance of the account address in the transaction receipt.")
+        raise Exception("Failed to find the allowance of the account address in the transaction receipt.")
 
     allowance = decrypt_value(allowanceCT, user_key)
     check_expected_result('allowance', expected_allowance, allowance)
@@ -101,12 +102,12 @@ def main(provider_url: str):
     # Compile the contract
     success = soda_helper.setup_contract(FILE_PATH + FILE_NAME, "private_erc20")
     if not success:
-        print("Failed to set up the contract")
+        raise Exception("Failed to set up the contract")
 
     # Deploy the contract
     receipt = soda_helper.deploy_contract("private_erc20", constructor_args=["Soda", "SOD", INITIAL_BALANCE])
     if receipt is None:
-        print("Failed to deploy the contract")
+        raise Exception("Failed to deploy the contract")
 
     contract = soda_helper.get_contract("private_erc20")
 
@@ -208,8 +209,10 @@ def main(provider_url: str):
 
 
 
-
 if __name__ == "__main__":
     url = parse_url_parameter()
     if (url is not None):
-        main(url)
+        try:
+            main(url)
+        except Exception as e:
+            logging.error("An error occurred: %s", e)

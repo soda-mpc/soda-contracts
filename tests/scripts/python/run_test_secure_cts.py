@@ -1,4 +1,4 @@
-import json
+import logging
 import os
 from eth_account import Account
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
@@ -9,8 +9,7 @@ FILE_PATH = 'tests/contracts/'
 def execute_transaction(soda_helper, function):  
     receipt = soda_helper.call_contract_function_transaction("secure_cts", function)
     if receipt is None:
-        print("Failed to call the transaction function")
-        return
+        raise Exception("Failed to call the transaction function")
 
 def call_view_functions(account, contract):
     x = contract.functions.GetX().call({'from': account.address})
@@ -39,12 +38,12 @@ def main(provider_url: str):
     # Compile the contract
     success = soda_helper.setup_contract(FILE_PATH + FILE_NAME, "secure_cts")
     if not success:
-        print("Failed to set up the contract")
+        raise Exception("Failed to set up the contract")
 
     # Deploy the contract
     receipt = soda_helper.deploy_contract("secure_cts", constructor_args=[])
     if receipt is None:
-        print("Failed to deploy the contract")
+        raise Exception("Failed to deploy the contract")
 
     contract = soda_helper.get_contract("secure_cts")
     
@@ -111,5 +110,8 @@ def main(provider_url: str):
 if __name__ == "__main__":
     url = parse_url_parameter()
     if (url is not None):
-        main(url)
+        try:
+            main(url)
+        except Exception as e:
+            logging.error("An error occurred: %s", e)
 

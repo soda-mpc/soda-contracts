@@ -5,6 +5,16 @@ import {SodaWeb3Helper, parseURLParameter} from '../../../lib/js/sodaWeb3Helper.
 const FILE_NAME = 'GetUserKeyContract.sol';
 const FILE_PATH = 'onboardUser/contracts/';
 
+function removeUserKeyFromFile(filename) {
+    // Read the original file and filter out the line containing "USER_KEY"
+    const fileContent = fs.readFileSync(filename, 'utf-8');
+    const lines = fileContent.split('\n');
+    const tempLines = lines.filter(line => !line.includes("USER_KEY"));
+    
+    // Write the modified content back to the same file
+    fs.writeFileSync(filename, tempLines.join('\n'), 'utf-8');
+}
+
 async function getUserKeyShares(account, contract, receipt) {
     // Processing the receipt to extract Balance events
     const userKeyEvents = await contract.getPastEvents('UserKey', {
@@ -23,7 +33,7 @@ async function getUserKeyShares(account, contract, receipt) {
         keyShare0 = targetEvent.returnValues._keyShare0;
         keyShare1 = targetEvent.returnValues._keyShare1;
     } else {
-        console.log("Failed to find the key shares of the account address in the transaction receipt.");
+        throw new Error("Failed to find the key shares of the account address in the transaction receipt.");
     }
     return [keyShare0, keyShare1];
 }
@@ -42,15 +52,13 @@ async function main() {
     // compile the onboard solidity contract
     const success = sodaHelper.setupContract(FILE_PATH, FILE_NAME, "onboard_user");
     if (!success){
-        console.log("Failed to set up the contract")
-        return
+        throw new Error("Failed to set up the contract")
     }
 
     // Deploy the contract
     let receipt = await sodaHelper.deployContract("onboard_user");
     if (!receipt){
-        console.log("Failed to deploy the contract")
-        return
+        throw new Error("Failed to deploy the contract")
     }
     
     // Generate RSA keys and sign the public key
@@ -60,8 +68,7 @@ async function main() {
     // Call the getUserKey function to get the encrypted AES key
     receipt = await sodaHelper.callContractTransaction("onboard_user", "getUserKey", [publicKey, signedEK]);
     if (!receipt){
-        console.log("Failed to call the transaction function")
-        return
+        throw new Error("Failed to call the transaction function")
     }
     let response = await getUserKeyShares(sodaHelper.getAccount(), sodaHelper.getContract("onboard_user"), receipt);
     const encryptedKey0 = response[0];
@@ -72,8 +79,13 @@ async function main() {
     const share1Buf = Buffer.from(encryptedKey1.substring(2), 'hex');
     const decryptedAESKey = recoverUserKey(privateKey, share0Buf, share1Buf);
 
+    removeUserKeyFromFile('.env'); // Remove the old USER_KEY from the .env file
+    // Write the new AES key to the .env file
     fs.appendFileSync('.env', `export USER_KEY='${decryptedAESKey.toString('hex')}'\n`);
     
 }
 
 main()
+  .catch(error => {
+    console.error(error)
+  });

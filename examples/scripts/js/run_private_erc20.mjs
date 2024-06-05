@@ -36,10 +36,7 @@ function decryptValue(myCTBalance, userKey) {
     // Decrypt the cipher
     const decryptedMessage = decrypt(userKey, r, cipher);
 
-    // console.log the decrypted cipher
-    const decryptedBalance = parseInt(decryptedMessage.toString('hex'), block_size);
-
-    return decryptedBalance;
+    return parseInt(decryptedMessage.toString('hex'), block_size);
 }
 
 async function getEncryptedBalance(sodaHelper, contract){
@@ -60,8 +57,7 @@ async function getEncryptedBalance(sodaHelper, contract){
     if (targetEvent) {
         return targetEvent.returnValues._balance;
     } else {
-        console.log("Failed to find balance of the account address in the transaction receipt.");
-        return null;
+        throw new Error("Failed to find balance of the account address in the transaction receipt.");
     }
 }
 
@@ -98,7 +94,7 @@ async function checkAllowance(sodaHelper, account, contract, user_key, expectedA
     if (targetEvent) {
         allowanceCT = targetEvent.returnValues._allowance;
     } else {
-        console.log("Failed to find the allowance of the account address in the transaction receipt.");
+        throw new Error("Failed to find the allowance of the account address in the transaction receipt.");
     }
 
     let allowance = decryptValue(allowanceCT, user_key)
@@ -120,15 +116,13 @@ async function main() {
     // compile the onboard solidity contract
     const success = sodaHelper.setupContract(FILE_PATH, FILE_NAME, "private_erc20");
     if (!success){
-        console.log("Failed to set up the contract")
-        return
+        throw new Error("Failed to set up the contract")
     }
 
     // Deploy the contract
     let receipt = await sodaHelper.deployContract("private_erc20", ["Soda", "SOD", INITIAL_BALANCE]);
     if (!receipt){
-        console.log("Failed to deploy the contract")
-        return
+        throw new Error("Failed to deploy the contract")
     }
 
     console.log("************* View functions *************");
@@ -226,4 +220,7 @@ async function main() {
 }
 
 main()
+  .catch(error => {
+    console.error(error)
+  });
 

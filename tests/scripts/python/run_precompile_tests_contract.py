@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from time import sleep
@@ -33,13 +34,13 @@ def setup(provider_url: str):
     for file_name in SOLIDITY_FILES:
         success = soda_helper.setup_contract("tests/contracts/" + file_name, file_name)
         if not success:
-            print("Failed to set up the contract")
+            raise Exception("Failed to set up the contract")
 
     # Deploy the contract
     receipts = soda_helper.deploy_multi_contracts(SOLIDITY_FILES, constructor_args=[])
     
     if len(receipts) != len(SOLIDITY_FILES):
-        print("Failed to deploy the contracts")
+        raise Exception("Failed to deploy the contracts")
 
     global NONCE
     NONCE = soda_helper.get_current_nonce()
@@ -270,21 +271,21 @@ def checkResults(soda_helper, expected_results, private_key):
     
     new_a, new_b, res = soda_helper.call_contract_view('PrecompilesTransferTestsContract.sol', "getResults")
     if not res:
-        print(f'Test transfer Failed.')
+        raise Exception(f'Test transfer Failed.')
     
     check_expected_result("transfer", expected_results["transfer_a"], new_a)
     check_expected_result("transfer", expected_results["transfer_b"], new_b)
     
     new_a, new_b, res = soda_helper.call_contract_view('PrecompilesTransferScalarTestsContract.sol', "getResults")
     if not res:
-        print(f'Test transfer scalar failed.')
+        raise Exception(f'Test transfer scalar failed.')
     
     check_expected_result("transfer scalar", expected_results["transfer_a"], new_a)
     check_expected_result("transfer scalar", expected_results["transfer_b"], new_b)
 
     new_a, new_b, res, allowance = soda_helper.call_contract_view('PrecompilesTransferAllowanceTestsContract.sol', "getResults")
     if not res:
-        print(f'Test transfer with allowance failed.')
+        raise Exception(f'Test transfer with allowance failed.')
     
     check_expected_result("transfer_allowance", expected_results["transfer_a"], new_a)
     check_expected_result("transfer_allowance", expected_results["transfer_b"], new_b)
@@ -292,7 +293,7 @@ def checkResults(soda_helper, expected_results, private_key):
 
     new_a, new_b, res, allowance = soda_helper.call_contract_view('PrecompilesTransferAllowanceTestsContract.sol', "getResults")
     if not res:
-        print(f'Test transfer with allowance scalar failed.')
+        raise Exception(f'Test transfer with allowance scalar failed.')
     
     check_expected_result("transfer_allowance_scalar", expected_results["transfer_a"], new_a)
     check_expected_result("transfer_allowance_scalar", expected_results["transfer_b"], new_b)
@@ -323,7 +324,7 @@ def checkResults(soda_helper, expected_results, private_key):
         print(f'Test Random succeeded: {result}')
         last_random_result = result
     else:
-        raise ValueError(f'Test Random failed. {result}')
+        raise Exception(f'Test Random failed. {result}')
 
     global last_random_bounded_result
     result = soda_helper.call_contract_view("PrecompilesMiscellaneous1TestsContract.sol", "getRandomBounded")
@@ -331,7 +332,7 @@ def checkResults(soda_helper, expected_results, private_key):
         print(f'Test RandomBoundedBits succeeded: {result}')
         last_random_bounded_result = result
     else:
-        raise ValueError(f'Test RandomBoundedBits failed. {result}')
+        raise Exception(f'Test RandomBoundedBits failed. {result}')
 
     result = soda_helper.call_contract_view('PrecompilesMiscellaneous1TestsContract.sol', "getValidateCiphertextResult")
     check_expected_result("validate_ciphertext", expected_results["validate_ciphertext"], result)
@@ -578,4 +579,7 @@ def main(provider_url: str):
 if __name__ == "__main__":
     url = parse_url_parameter()
     if (url is not None):
-        main(url)
+        try:
+            main(url)
+        except Exception as e:
+            logging.error("An error occurred: %s", e)
