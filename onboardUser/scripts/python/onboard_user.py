@@ -3,7 +3,6 @@ import sys
 sys.path.append('soda-sdk')
 from python.crypto import generate_rsa_keypair, sign, recover_user_key
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
-from time import sleep
 
 FILE_NAME = 'GetUserKeyContract.sol'
 FILE_PATH = 'onboardUser/contracts/'

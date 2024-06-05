@@ -5,12 +5,38 @@ from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 import sys
 sys.path.append('soda-sdk')
 from python.crypto import generate_rsa_keypair, sign, recover_user_key, prepare_delete_key_signature
-from time import sleep
 
 FILE_NAME = 'GetUserKeyContract.sol'
 FILE_PATH = 'onboardUser/contracts/'
 SIGNATURE_SIZE = 65
 
+def getUserKeyShares(account, contract, receipt):
+    """
+    This function retrieves the key shares of a user from a transaction receipt. It processes the receipt 
+    to get the UserKey events, then iterates through these events to find the ones that match the provided 
+    account address. If it finds matching events, it extracts the key shares from these events. If it doesn't 
+    find any matching events, it prints an error message.
+
+    @param {object} account - The account object, which includes the user's address.
+    @param {object} contract - The contract object, which includes the contract's events.
+    @param {object} receipt - The transaction receipt to process.
+
+    @return {tuple} A tuple containing the two key shares, or (None, None) if no matching events were found.
+    """
+    user_key_events = contract.events.UserKey().process_receipt(receipt)
+
+    key_0_share = None
+    key_1_share = None
+    # Filter events for the specific address
+    for event in user_key_events:
+        if event['args']['_owner'].lower() == account.address.lower():
+            key_0_share = event['args']['_keyShare0']
+            key_1_share = event['args']['_keyShare1']
+    
+    if key_0_share is None or key_1_share is None:
+        print("Failed to find the key shares of the account address in the transaction receipt.")
+
+    return key_0_share, key_1_share
 
 def getUserKey(signing_key, soda_helper, contract):
     # Generate new RSA key pair
@@ -24,8 +50,7 @@ def getUserKey(signing_key, soda_helper, contract):
         print("Failed to call the transaction function")
         return
 
-    sleep(30)
-    encryptedKey0, encryptedKey1 = contract.functions.getSavedUserKey().call()
+    encryptedKey0, encryptedKey1 = getUserKeyShares(soda_helper.get_account(), contract, receipt)
 
     # Recover the aes key using the RSA private key and the given shares
     return recover_user_key(private_key, encryptedKey0, encryptedKey1)

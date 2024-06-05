@@ -2,7 +2,6 @@ import json
 import os
 from eth_account import Account
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
-from time import sleep
 
 FILE_NAME = 'TestSecureCts.sol'
 FILE_PATH = 'tests/contracts/'
@@ -55,8 +54,6 @@ def main(provider_url: str):
     function = contract.functions.setGeneratedCtToSecureStorage(val)
     execute_transaction(soda_helper, function)
 
-    sleep(30)
-
     res = call_view_functions(account, contract)
     check_expected_result("setGeneratedCtToSecureStorage", val*2, res)
    
@@ -65,7 +62,6 @@ def main(provider_url: str):
     function = contract.functions.onBoradFromSecureStorage()
     execute_transaction(soda_helper, function)
 
-    sleep(10)
     res = call_view_functions(account, contract)
     check_expected_result("onBoradFromSecureStorage", val*2*4, res)
     
@@ -73,7 +69,6 @@ def main(provider_url: str):
     function = contract.functions.tryOnBoradStolenMemory()
     execute_transaction(soda_helper, function)
 
-    sleep(10)
     res = call_view_functions(account, contract)
     check_expected_result("tryOnBoradStolenMemory", val*2*4, res)
 
@@ -81,7 +76,6 @@ def main(provider_url: str):
     function = contract.functions.tryOnBoradStolenStorage()
     execute_transaction(soda_helper, function)
 
-    sleep(10)
     res = call_view_functions(account, contract)
     check_expected_result("tryOnBoradStolenStorage", val*2*4, res)
     
@@ -89,26 +83,22 @@ def main(provider_url: str):
     function = contract.functions.setGeneratedCtToSecureStorage(val)
     execute_transaction(soda_helper, function)
 
-    sleep(10)
     res = call_view_functions(account, contract)
     check_expected_result("setGeneratedCtToSecureStorage", val*2, res)
 
     function = contract.functions.createContractDeepContract()
     execute_transaction(soda_helper, function)
-    sleep(10)
-
+    
     val = 4
     function = contract.functions.testDeep(val)
     execute_transaction(soda_helper, function)
-    sleep(10)
-
+    
     res = call_view_functions(account, contract)
     check_expected_result("testDeep", val*2, res)
 
     function = contract.functions.testDeepStoredData(val)
     execute_transaction(soda_helper, function)
 
-    sleep(10)
     res = call_view_functions(account, contract)
     check_expected_result("testDeepStoredData", val*4, res)
     
