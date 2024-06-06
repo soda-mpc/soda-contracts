@@ -10,7 +10,7 @@ from solcx import compile_standard, install_solc, get_installed_solc_versions
 import argparse
 from time import sleep
 sys.path.append('soda-sdk')
-from python.crypto import block_size, decrypt
+from python.crypto import block_size, decrypt, generate_rsa_keypair, sign, decrypt_rsa
 
 LOCAL_PROVIDER_PORT = os.environ.get('LOCAL_PROVIDER_PORT', '7000')
 
@@ -20,6 +20,7 @@ SOLC_VERSION = '0.8.19'
 DEFAULT_GAS_PRICE = 30
 DEFAULT_GAS_LIMIT = 10000000
 DEFAULT_CHAIN_ID = 50505050
+BLOCK_SIZE = 32
 
 
 def parse_url_parameter():
@@ -35,10 +36,9 @@ def parse_url_parameter():
         return None
 
 
-def decrypt_value_int(encrypted_value, user_key):
-
+def decrypt_bytes(encrypted_value, user_key):
     # Convert ct to bytes (big-endian)
-    byte_array = encrypted_value.to_bytes(32, byteorder='big')
+    byte_array = encrypted_value.to_bytes(BLOCK_SIZE, byteorder='big')
 
     # Split ct into two 128-bit arrays r and cipher
     cipher = byte_array[:block_size]
@@ -46,7 +46,18 @@ def decrypt_value_int(encrypted_value, user_key):
 
     # Decrypt the cipher
     decrypted_val_bytes = decrypt(user_key, r, cipher)
+    return decrypted_val_bytes
+
+
+def decrypt_value_int(encrypted_value, user_key):
+    decrypted_val_bytes = decrypt_bytes(encrypted_value, user_key)
     decrypted_val = int.from_bytes(decrypted_val_bytes, 'big')
+    return decrypted_val
+
+
+def decrypt_value_bool(encrypted_value, user_key):
+    decrypted_val_bytes = decrypt_bytes(encrypted_value, user_key)
+    decrypted_val = bool.from_bytes(decrypted_val_bytes, 'big')
     return decrypted_val
 
 
@@ -69,8 +80,8 @@ def execute_transaction(soda_helper, account, contract_id, function):
     return tx_hash
 
 
-def extract_event_value(contract, receipt, filter_func, target_attribute):
-    value_events = contract.events.Identifier().process_receipt(receipt)
+def extract_event_value(contract, receipt, filter_func, event_name, target_attribute):
+    value_events = contract.events[event_name]().process_receipt(receipt)
 
     # Filter events using the provided filter function
     value_encrypted = None
@@ -79,6 +90,41 @@ def extract_event_value(contract, receipt, filter_func, target_attribute):
             value_encrypted = event['args'][target_attribute]
 
     return value_encrypted
+
+
+def get_user_aes_key(soda_helper, account):
+    """
+        This function is used to onboard a user by generating an AES key for them.
+        The AES key is used to encrypt and decrypt values.
+    """
+    success = soda_helper.setup_contract('onboardUser/contracts/GetUserKeyContract.sol', "onboard_user")
+    if not success:
+        print("Failed to set up the contract")
+
+    # Deploy the contract
+    receipt = soda_helper.deploy_contract("onboard_user", constructor_args=[], account=account)
+    if receipt is None:
+        print("Failed to deploy the contract")
+
+    contract = soda_helper.get_contract("onboard_user")
+
+    # Generate new RSA key pair
+    private_key, public_key = generate_rsa_keypair()
+    # Sign the public key
+    signed_ek = sign(public_key, bytes.fromhex(account._private_key.hex()[2:]))
+
+    # Call the getUserKey function to get the encrypted AES key
+    receipt = soda_helper.call_contract_transaction("onboard_user", "getUserKey", func_args=[public_key, signed_ek],
+                                                    account=account)
+    if receipt is None:
+        print("Failed to call the transaction function")
+        return
+    encryptedKey = contract.functions.getSavedUserKey().call({'from': account.address})
+
+    # Decrypt the aes key using the RSA private key
+    decrypted_aes_key = decrypt_rsa(private_key, encryptedKey)
+
+    return decrypted_aes_key
 
 
 class SodaWeb3Helper:
@@ -99,14 +145,15 @@ class SodaWeb3Helper:
         
     def setup_contract(self, contract_path, contract_id, overwrite=False, 
                        mpc_inst_path="lib/solidity/MpcInterface.sol", 
-                       mpc_core_path="lib/solidity/MpcCore.sol"):
+                       mpc_core_path="lib/solidity/MpcCore.sol",
+                       additional_sources=None):
         
         if contract_id in self.contracts and not overwrite:
             print(f"Contract with id {contract_id} already exists. Use the 'overwrite' parameter to overwrite it.")
             return False
         
         try:
-            contract_bytecode, contract_abi = compile_contract(contract_path, mpc_inst_path, mpc_core_path)
+            contract_bytecode, contract_abi = compile_contract(contract_path, mpc_inst_path, mpc_core_path, additional_sources)
         except Exception as e:
             print(f"Failed to compile the contract: {e}")
             return False
@@ -428,7 +475,8 @@ class SodaWeb3Helper:
         except Exception as e:
             print(f"Failed to send the transaction: {e}")
             return None
-    
+
+
 def load_contract(file_path):
     # Ensure the file path is valid
     if not os.path.exists(file_path):
@@ -438,7 +486,13 @@ def load_contract(file_path):
     with open(file_path, 'r') as file:
         return file.read()
 
-def compile_contract(file_path, mpc_inst_path="lib/solidity/MpcInterface.sol", mpc_core_path="lib/solidity/MpcCore.sol"):
+
+def compile_contract(
+        file_path,
+        mpc_inst_path="lib/solidity/MpcInterface.sol",
+        mpc_core_path="lib/solidity/MpcCore.sol",
+        additional_sources=None):
+
     print(f'Current PWD: {os.getcwd()}')
     print(f'MPC INST {mpc_inst_path}')
     print(f'MPC CORE {mpc_core_path}')
@@ -449,14 +503,18 @@ def compile_contract(file_path, mpc_inst_path="lib/solidity/MpcInterface.sol", m
     print(f"Compiling {contract_name}...")
     
     solidity_code = load_contract(file_path)
-    
+
+    sources = {
+        "MpcInterface.sol": {"urls": [mpc_inst_path]},
+        "MpcCore.sol": {"urls": [mpc_core_path]},
+        file_path: {"content": solidity_code},
+    }
+    if additional_sources:
+        sources.update(additional_sources)
+
     compiled_sol = compile_standard({
         "language": "Solidity",
-        "sources": {
-            "MpcInterface.sol": {"urls": [mpc_inst_path]},
-            "MpcCore.sol": {"urls": [mpc_core_path]},
-            file_path: {"content": solidity_code},
-        },
+        "sources": sources,
         "settings": {
             "outputSelection": {
                 "*": {

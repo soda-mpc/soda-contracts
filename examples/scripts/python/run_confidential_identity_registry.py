@@ -92,7 +92,7 @@ def main(provider_url: str):
     def filter_func(event):
         return event['args']['_reader'].lower() == owner.address.lower() and event['args']['_identifier'] == 'age'
 
-    age_encrypted = extract_event_value(contract, receipt, filter_func, target_attribute='_value')
+    age_encrypted = extract_event_value(contract, receipt, filter_func, event_name='Identifier', target_attribute='_value')
 
     print(f'Age encrypted: {age_encrypted}')
     age_decrypted = decrypt_value_int(age_encrypted, user_key)
@@ -114,7 +114,12 @@ def main(provider_url: str):
     def filter_func(event):
         return event['args']['_reader'].lower() == user2.address.lower() and event['args']['_identifier'] == 'age'
 
-    age_encrypted = extract_event_value(contract, receipt, filter_func, target_attribute='_value')
+    age_encrypted = extract_event_value(
+        contract,
+        receipt,
+        filter_func,
+        event_name='Identifier',
+        target_attribute='_value')
     assert age_encrypted is None, f'User2 should not be able to read the encrypted age'
 
 
