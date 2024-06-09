@@ -47,7 +47,19 @@ def setup(provider_url: str):
 
     return soda_helper
 
-def execute_transaction(name, soda_helper, contract, func_name, func_args=[]):
+def execute_transaction_with_gas_estimation(name, soda_helper, contract, func_name, func_args=None):
+    if func_args is None:
+        func_args = []
+    gas_estimate = soda_helper.estimate_gas(contract, func_name, func_args=func_args)
+    print('Estimated Gas:', gas_estimate)
+    global NONCE
+    tx_hash = soda_helper.call_contract_transaction_async(contract, func_name, NONCE, func_args=func_args)
+    NONCE += 1
+    return tx_hash
+
+def execute_transaction(name, soda_helper, contract, func_name, func_args=None):
+    if func_args is None:
+        func_args = []
     global NONCE
     tx_hash = soda_helper.call_contract_transaction_async(contract, func_name, NONCE, func_args=func_args)
     NONCE += 1
@@ -61,79 +73,79 @@ def check_expected_result(name, expected_result, result):
 
 # Test functions
 def test_addition(soda_helper, contract, a, b):
-    return execute_transaction("addition", soda_helper, contract, "addTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("addition", soda_helper, contract, "addTest", func_args=[a, b])
 
 def test_checked_addition(soda_helper, contract, a, b):
-    return execute_transaction("checked addition", soda_helper, contract, "checkedAddTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("checked addition", soda_helper, contract, "checkedAddTest", func_args=[a, b])
 
 def test_subtraction(soda_helper, contract, a, b):
-    return execute_transaction("subtraction", soda_helper, contract, "subTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("subtraction", soda_helper, contract, "subTest", func_args=[a, b])
 
 def test_checked_subtraction(soda_helper, contract, a, b):
-    return execute_transaction("checked subtraction", soda_helper, contract, "checkedSubTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("checked subtraction", soda_helper, contract, "checkedSubTest", func_args=[a, b])
 
 def test_multiplication(soda_helper, contract, a, b):
-    return execute_transaction("multiplication", soda_helper, contract, "mulTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("multiplication", soda_helper, contract, "mulTest", func_args=[a, b])
 
 def test_division(soda_helper, contract, a, b):
-    return execute_transaction("division", soda_helper, contract, "divTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("division", soda_helper, contract, "divTest", func_args=[a, b])
 
 def test_remainder(soda_helper, contract, a, b):
-    return execute_transaction("reminder", soda_helper, contract, "remTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("reminder", soda_helper, contract, "remTest", func_args=[a, b])
 
 def test_bitwise_and(soda_helper, contract, a, b):
-    return execute_transaction("bitwise and", soda_helper, contract, "andTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("bitwise and", soda_helper, contract, "andTest", func_args=[a, b])
 
 def test_bitwise_or(soda_helper, contract, a, b):
-    return execute_transaction("bitwise or", soda_helper, contract, "orTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("bitwise or", soda_helper, contract, "orTest", func_args=[a, b])
 
 def test_bitwise_xor(soda_helper, contract, a, b):
-    return execute_transaction("bitwise xor", soda_helper, contract, "xorTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("bitwise xor", soda_helper, contract, "xorTest", func_args=[a, b])
 
 def test_bitwise_shift_left(soda_helper, contract, a, b):
-    return execute_transaction("bitwise shift left", soda_helper, contract, "shlTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("bitwise shift left", soda_helper, contract, "shlTest", func_args=[a, b])
 
 def test_bitwise_shift_right(soda_helper, contract, a, b):
-    return execute_transaction("bitwise shift right", soda_helper, contract, "shrTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("bitwise shift right", soda_helper, contract, "shrTest", func_args=[a, b])
 
 def test_min(soda_helper, contract, a, b):
-    return execute_transaction("min", soda_helper, contract, "minTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("min", soda_helper, contract, "minTest", func_args=[a, b])
 
 def test_max(soda_helper, contract, a, b):
-    return execute_transaction("max", soda_helper, contract, "maxTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("max", soda_helper, contract, "maxTest", func_args=[a, b])
 
 def test_eq(soda_helper, contract, a, b):
-    return execute_transaction("equality", soda_helper, contract, "eqTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("equality", soda_helper, contract, "eqTest", func_args=[a, b])
 
 def test_ne(soda_helper, contract, a, b):
-    return execute_transaction("not equal", soda_helper, contract, "neTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("not equal", soda_helper, contract, "neTest", func_args=[a, b])
 
 def test_ge(soda_helper, contract, a, b):
-    return execute_transaction("greater than or equal", soda_helper, contract, "geTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("greater than or equal", soda_helper, contract, "geTest", func_args=[a, b])
 
 def test_gt(soda_helper, contract, a, b):
-    return execute_transaction("greater than", soda_helper, contract, "gtTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("greater than", soda_helper, contract, "gtTest", func_args=[a, b])
 
 def test_le(soda_helper, contract, a, b):
-    return execute_transaction("less than or equal", soda_helper, contract, "leTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("less than or equal", soda_helper, contract, "leTest", func_args=[a, b])
 
 def test_lt(soda_helper, contract, a, b):
-    return execute_transaction("less than", soda_helper, contract, "ltTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("less than", soda_helper, contract, "ltTest", func_args=[a, b])
 
 def test_mux(soda_helper, contract, selectionBit, a, b):
-    return execute_transaction("mux", soda_helper, contract, "muxTest", func_args=[selectionBit, a, b])
+    return execute_transaction_with_gas_estimation("mux", soda_helper, contract, "muxTest", func_args=[selectionBit, a, b])
 
 def test_transfer(soda_helper, contract, a, b, amount):
-    return execute_transaction("transfer", soda_helper, contract, "transferTest", func_args=[a, b, amount])
+    return execute_transaction_with_gas_estimation("transfer", soda_helper, contract, "transferTest", func_args=[a, b, amount])
 
 def test_transfer_allowance(soda_helper, contract, a, b, amount, allowance):
-    return execute_transaction("transfer with allowance", soda_helper, contract, "transferWithAllowanceTest", func_args=[a, b, amount, allowance])
+    return execute_transaction_with_gas_estimation("transfer with allowance", soda_helper, contract, "transferWithAllowanceTest", func_args=[a, b, amount, allowance])
 
 def test_offboardOnboard(soda_helper, contract, a):
-    return execute_transaction("offboard_Onboard", soda_helper, contract, "offboardOnboardTest", func_args=[a, a, a, a])
+    return execute_transaction_with_gas_estimation("offboard_Onboard", soda_helper, contract, "offboardOnboardTest", func_args=[a, a, a, a])
 
 def test_not(soda_helper, contract, bit):
-    return execute_transaction("not", soda_helper, contract, "notTest", func_args=[bit])
+    return execute_transaction_with_gas_estimation("not", soda_helper, contract, "notTest", func_args=[bit])
     
  
 def checkCt(ct, decrypted_aes_key, expected_result):
@@ -154,21 +166,21 @@ def checkCt(ct, decrypted_aes_key, expected_result):
 def test_getUserKey(soda_helper, contract, a, public_key):
     signing_key = os.environ.get('SIGNING_KEY')
     signature = sign(public_key, bytes.fromhex(signing_key[2:]))
-    execute_transaction("get user key", soda_helper, contract, "userKeyTest", func_args=[public_key, signature])
+    execute_transaction_with_gas_estimation("get user key", soda_helper, contract, "userKeyTest", func_args=[public_key, signature])
 
-    return execute_transaction("offboard to user", soda_helper, contract, "offboardToUserTest", func_args=[a, soda_helper.get_account().address])
+    return execute_transaction_with_gas_estimation("offboard to user", soda_helper, contract, "offboardToUserTest", func_args=[a, soda_helper.get_account().address])
 
 last_random_result = 0
 last_random_bounded_result = 0
 
 def test_random(soda_helper, contract):
-    return execute_transaction("random", soda_helper, contract, "randomTest")
+    return execute_transaction_with_gas_estimation("random", soda_helper, contract, "randomTest")
 
 def test_randomBoundedBits(soda_helper, contract, numBits):
-    return execute_transaction("random bounded", soda_helper, contract, "randomBoundedTest", func_args=[numBits])
+    return execute_transaction_with_gas_estimation("random bounded", soda_helper, contract, "randomBoundedTest", func_args=[numBits])
 
 def test_boolean(soda_helper, contract, bool_a, bool_b, bit):
-    return execute_transaction("boolean tests", soda_helper, contract, "booleanTest", func_args=[bool_a, bool_b, bit])
+    return execute_transaction_with_gas_estimation("boolean tests", soda_helper, contract, "booleanTest", func_args=[bool_a, bool_b, bit])
 
 def get_function_signature(function_abi):
     # Extract the input types from the ABI
@@ -193,7 +205,7 @@ def test_validate_ciphertext(soda_helper, contract_str, a):
     func_sig = get_function_signature(function.abi) # Get the function signature
     # Prepare the input text for the function
     ct, signature = prepare_IT(a, user_aes_key, Account.from_key(sign_key), contract, func_sig, bytes.fromhex(sign_key[2:]))
-    return execute_transaction("validate ciphertext", soda_helper, contract_str, "validateCiphertextTest", func_args=[ct, ct, ct, ct, signature])
+    return execute_transaction_with_gas_estimation("validate ciphertext", soda_helper, contract_str, "validateCiphertextTest", func_args=[ct, ct, ct, ct, signature])
 
 def checkResults(soda_helper, expected_results, private_key):
     

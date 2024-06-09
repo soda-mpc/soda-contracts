@@ -9,7 +9,7 @@ import argparse
 from time import sleep
 
 LOCAL_PROVIDER_URL = 'http://localhost:7001'
-REMOTE_HTTP_PROVIDER_URL = 'https://node.sodalabs.net' 
+REMOTE_HTTP_PROVIDER_URL = 'http://ec2-16-16-204-216.eu-north-1.compute.amazonaws.com:7000' 
 SOLC_VERSION = '0.8.19'
 DEFAULT_GAS_PRICE = 30
 DEFAULT_GAS_LIMIT = 10000000
@@ -168,6 +168,30 @@ class SodaWeb3Helper:
             account = self.account
             
         return self.web3.eth.get_transaction_count(account.address)
+    
+    def estimate_gas(self, 
+                    contract_id, 
+                    func_name, 
+                    func_args=[], 
+                    account=None):
+        if account is None:
+            account = self.account
+
+        if contract_id not in self.contracts:
+            print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
+            return None
+
+        try:
+            if not hasattr(self.contracts[contract_id].functions, func_name):  
+                print(f"Function {func_name} does not exist in contract {contract_id}.")  
+                return None 
+            func_to_call = getattr(self.contracts[contract_id].functions, func_name)  
+            return func_to_call(*func_args).estimate_gas({
+                'from': account.address,
+            })  
+        except Exception as e:
+            print(f"Error estimating gas: {e}")
+            return None  
     
     def call_contract_transaction(self, 
                                   contract_id, 
