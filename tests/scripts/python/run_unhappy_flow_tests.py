@@ -185,4 +185,5 @@ if __name__ == "__main__":
             main(url)
         except Exception as e:
             logging.error("An error occurred: %s", e)
+            raise e
             
