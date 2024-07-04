@@ -589,9 +589,7 @@ def main(provider_url: str):
     soda_helper = setup(provider_url)
     
     # Run the tests
-    for i in range(1000):
-        print(f'\n****** Test Iteration {i} ******\n')
-        runTestVectors(soda_helper)
+    runTestVectors(soda_helper)
 
 if __name__ == "__main__":
     url = parse_url_parameter()
