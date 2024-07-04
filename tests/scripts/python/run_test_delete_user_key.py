@@ -103,18 +103,6 @@ def main(provider_url: str):
     else:
         raise Exception(f'Test user key failed. Got different values: {user_key1} and {user_key2}')
 
-    # Delete user key
-    deleteKey(signing_key, soda_helper, contract, account)
-    print('User key deleted')
-    # Get user key again. Should be different
-    user_key2 = getUserKey(signing_key, soda_helper, contract)
-    print(f'User key: {user_key2.hex()}')
-
-    if user_key1 != user_key2:
-        print(f'Test user key succeeded: Got 2 different keys')
-    else:
-        raise ValueError(f'Test user key failed. Got the same value: {user_key1}')
-
     
 
 

@@ -9,7 +9,7 @@ import argparse
 from time import sleep
 
 LOCAL_PROVIDER_URL = 'http://localhost:7001'
-REMOTE_HTTP_PROVIDER_URL = 'http://ec2-16-16-204-216.eu-north-1.compute.amazonaws.com:7000' 
+REMOTE_HTTP_PROVIDER_URL = 'http://ec2-13-48-71-77.eu-north-1.compute.amazonaws.com:7000' 
 SOLC_VERSION = '0.8.19'
 DEFAULT_GAS_PRICE = 30
 DEFAULT_GAS_LIMIT = 10000000
@@ -24,8 +24,7 @@ def parse_url_parameter():
     elif args.provider_url == "Remote":
         return REMOTE_HTTP_PROVIDER_URL
     else:
-        print("Invalid provider url")
-        return None
+        raise ValueError("Invalid provider url")
 
 class SodaWeb3Helper:
     def __init__(self, private_key_string, http_provider_url):
@@ -48,22 +47,19 @@ class SodaWeb3Helper:
                        mpc_core_path="lib/solidity/MpcCore.sol"):
         
         if contract_id in self.contracts and not overwrite:
-            print(f"Contract with id {contract_id} already exists. Use the 'overwrite' parameter to overwrite it.")
-            return False
+            raise Exception(f"Contract with id {contract_id} already exists. Use the 'overwrite' parameter to overwrite it.")
         
         try:
             contract_bytecode, contract_abi = compile_contract(contract_path, mpc_inst_path, mpc_core_path)
         except Exception as e:
-            print(f"Failed to compile the contract: {e}")
-            return False
+            raise Exception(f"Failed to compile the contract: {e}")
         
         self.contracts[contract_id] = self.web3.eth.contract(abi=contract_abi, bytecode=contract_bytecode)
         return True
 
     def get_contract(self, contract_id):
         if contract_id not in self.contracts:
-            print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
-            return None
+            raise Exception(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
         return self.contracts[contract_id]
 
     def get_account(self):
@@ -156,8 +152,7 @@ class SodaWeb3Helper:
     
     def call_contract_view(self, contract_id, func_name, func_args=[]):
         if contract_id not in self.contracts:
-            print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
-            return None
+            raise Exception(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
         
         contract = self.contracts[contract_id]
         func = getattr(contract.functions, func_name)
@@ -178,20 +173,17 @@ class SodaWeb3Helper:
             account = self.account
 
         if contract_id not in self.contracts:
-            print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
-            return None
+            raise Exception(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
 
         try:
             if not hasattr(self.contracts[contract_id].functions, func_name):  
-                print(f"Function {func_name} does not exist in contract {contract_id}.")  
-                return None 
+                raise Exception(f"Function {func_name} does not exist in contract {contract_id}.")  
             func_to_call = getattr(self.contracts[contract_id].functions, func_name)  
             return func_to_call(*func_args).estimate_gas({
                 'from': account.address,
             })  
         except Exception as e:
-            print(f"Error estimating gas: {e}")
-            return None  
+            raise Exception(f"Error estimating gas: {e}")
     
     def call_contract_transaction(self, 
                                   contract_id, 
@@ -205,8 +197,7 @@ class SodaWeb3Helper:
             account = self.account
 
         if contract_id not in self.contracts:
-            print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
-            return None
+            raise Exception(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
         
         func_to_call = getattr(self.contracts[contract_id].functions, func_name)
         transaction = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, func_args, account)
@@ -226,8 +217,7 @@ class SodaWeb3Helper:
             account = self.account
 
         if contract_id not in self.contracts:
-            print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
-            return None
+            raise Exception(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
 
          
         func_to_call = getattr(self.contracts[contract_id].functions, func_name)
@@ -246,8 +236,7 @@ class SodaWeb3Helper:
             account = self.account
         
         if contract_id not in self.contracts:
-            print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
-            return None
+            raise Exception(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
         
         # transaction = self._build_function_transaction(func, func.estimate_gas({'from': self.account.address}), gas_price, chain_id, account)
         transaction = self._build_function_transaction(func, gas_limit, gas_price, chain_id, account)
@@ -266,8 +255,7 @@ class SodaWeb3Helper:
             account = self.account
         
         if contract_id not in self.contracts:
-            print(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
-            return None
+            raise Exception(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
         
         transaction = self._build_function_transaction(func, gas_limit, gas_price, chain_id, account, nonce)
         
@@ -278,8 +266,7 @@ class SodaWeb3Helper:
     
     def get_native_currency_balance(self, address):
         if not self.validate_address(address)['valid']:
-            print(f"Invalid address: {address}")
-            return None
+            raise Exception(f"Invalid address: {address}")
         
         return self.web3.eth.get_balance(address)
     
@@ -298,8 +285,7 @@ class SodaWeb3Helper:
             account = self.account
         
         if not self.validate_address(to_address)['safe']:
-            print(f"Invalid address: {to_address}")
-            return None
+            raise Exception(f"Invalid address: {to_address}")
         
         transaction = {
             'to': to_address,
@@ -358,22 +344,19 @@ class SodaWeb3Helper:
         try:
             signed_txn = self.web3.eth.account.sign_transaction(transaction, account._private_key)
         except Exception as e:
-            print(f"Failed to sign the transaction: {e}")
-            return None
+            raise Exception(f"Failed to sign the transaction: {e}")
 
         try:
             tx_hash = self.web3.eth.send_raw_transaction(signed_txn.rawTransaction)
         except Exception as e:
-            print(f"Failed to send the transaction: {e}")
-            return None
+            raise Exception(f"Failed to send the transaction: {e}")
         if is_async:
             return tx_hash
         
         try:
             tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
         except Exception as e:
-            print(f"Failed to wait for the transaction receipt: {e}")
-            return None
+            raise Exception(f"Failed to wait for the transaction receipt: {e}")
 
         return tx_receipt
     
@@ -381,8 +364,7 @@ class SodaWeb3Helper:
         try:
             return self.web3.eth.send_raw_transaction(raw_tx)
         except Exception as e:
-            print(f"Failed to send the transaction: {e}")
-            return None
+            raise Exception(f"Failed to send the transaction: {e}")
     
 def load_contract(file_path):
     # Ensure the file path is valid

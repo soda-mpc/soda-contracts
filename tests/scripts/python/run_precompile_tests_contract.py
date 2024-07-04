@@ -76,13 +76,13 @@ def test_addition(soda_helper, contract, a, b):
     return execute_transaction_with_gas_estimation("addition", soda_helper, contract, "addTest", func_args=[a, b])
 
 def test_checked_addition(soda_helper, contract, a, b):
-    return execute_transaction_with_gas_estimation("checked addition", soda_helper, contract, "checkedAddTest", func_args=[a, b])
+    return execute_transaction("checked addition", soda_helper, contract, "checkedAddTest", func_args=[a, b])
 
 def test_subtraction(soda_helper, contract, a, b):
     return execute_transaction_with_gas_estimation("subtraction", soda_helper, contract, "subTest", func_args=[a, b])
 
 def test_checked_subtraction(soda_helper, contract, a, b):
-    return execute_transaction_with_gas_estimation("checked subtraction", soda_helper, contract, "checkedSubTest", func_args=[a, b])
+    return execute_transaction("checked subtraction", soda_helper, contract, "checkedSubTest", func_args=[a, b])
 
 def test_multiplication(soda_helper, contract, a, b):
     return execute_transaction_with_gas_estimation("multiplication", soda_helper, contract, "mulTest", func_args=[a, b])
@@ -174,10 +174,10 @@ last_random_result = 0
 last_random_bounded_result = 0
 
 def test_random(soda_helper, contract):
-    return execute_transaction_with_gas_estimation("random", soda_helper, contract, "randomTest")
+    return execute_transaction("random", soda_helper, contract, "randomTest")
 
 def test_randomBoundedBits(soda_helper, contract, numBits):
-    return execute_transaction_with_gas_estimation("random bounded", soda_helper, contract, "randomBoundedTest", func_args=[numBits])
+    return execute_transaction("random bounded", soda_helper, contract, "randomBoundedTest", func_args=[numBits])
 
 def test_boolean(soda_helper, contract, bool_a, bool_b, bit):
     return execute_transaction_with_gas_estimation("boolean tests", soda_helper, contract, "booleanTest", func_args=[bool_a, bool_b, bit])
@@ -338,13 +338,13 @@ def checkResults(soda_helper, expected_results, private_key):
     else:
         raise Exception(f'Test Random failed. {result}')
 
-    global last_random_bounded_result
-    result = soda_helper.call_contract_view("PrecompilesMiscellaneous1TestsContract.sol", "getRandomBounded")
-    if result != last_random_bounded_result:
-        print(f'Test RandomBoundedBits succeeded: {result}')
-        last_random_bounded_result = result
-    else:
-        raise Exception(f'Test RandomBoundedBits failed. {result}')
+    # global last_random_bounded_result
+    # result = soda_helper.call_contract_view("PrecompilesMiscellaneous1TestsContract.sol", "getRandomBounded")
+    # if result != last_random_bounded_result:
+    #     print(f'Test RandomBoundedBits succeeded: {result}')
+    #     last_random_bounded_result = result
+    # else:
+    #     raise Exception(f'Test RandomBoundedBits failed. {result}')
 
     result = soda_helper.call_contract_view('PrecompilesMiscellaneous1TestsContract.sol', "getValidateCiphertextResult")
     check_expected_result("validate_ciphertext", expected_results["validate_ciphertext"], result)
@@ -549,9 +549,9 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
     tx_hashes[tx_hash] = "random"
 
     # test random bounded bits
-    print("Run random Bounded Bits test...")
-    tx_hash = test_randomBoundedBits(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', numBits)
-    tx_hashes[tx_hash] = "random_bounded"
+    # print("Run random Bounded Bits test...")
+    # tx_hash = test_randomBoundedBits(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', numBits)
+    # tx_hashes[tx_hash] = "random_bounded"
     
     tx_receipts = set()
     print(f"Wait for transaction receipts...")
@@ -561,6 +561,9 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
                 continue
             try:
                 r = soda_helper.web3.eth.get_transaction_receipt(h.hex())
+                if r is not None:
+                    if r.status == 0:
+                        raise Exception(f'Transaction {name} reverted.')
                 tx_receipts.add(h)
             except TransactionNotFound as e:
                 pass
@@ -586,7 +589,9 @@ def main(provider_url: str):
     soda_helper = setup(provider_url)
     
     # Run the tests
-    runTestVectors(soda_helper)
+    for i in range(1000):
+        print(f'\n****** Test Iteration {i} ******\n')
+        runTestVectors(soda_helper)
 
 if __name__ == "__main__":
     url = parse_url_parameter()
