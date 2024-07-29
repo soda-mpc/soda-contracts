@@ -15,6 +15,7 @@ interface ExtendedOperations {
     function Sub(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 result);
     function CheckedSub(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 overflowBit, uint256 result);
     function Mul(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 result);
+    function CheckedMul(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 overflowBit, uint256 result);
     function Div(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 result);
     function Rem(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 result);
     function And(bytes3 metaData, uint256 lhs, uint256 rhs) external returns (uint256 result);

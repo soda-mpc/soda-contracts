@@ -87,6 +87,9 @@ def test_checked_subtraction(soda_helper, contract, a, b):
 def test_multiplication(soda_helper, contract, a, b):
     return execute_transaction_with_gas_estimation("multiplication", soda_helper, contract, "mulTest", func_args=[a, b])
 
+def test_checked_multiplication(soda_helper, contract, a, b):
+    return execute_transaction("checked multiplication", soda_helper, contract, "checkedMulTest", func_args=[a, b])
+
 def test_division(soda_helper, contract, a, b):
     return execute_transaction_with_gas_estimation("division", soda_helper, contract, "divTest", func_args=[a, b])
 
@@ -221,8 +224,11 @@ def checkResults(soda_helper, expected_results, private_key):
     result = soda_helper.call_contract_view('PrecompilesCheckedFuncsTestsContract.sol', "getSubResult")
     check_expected_result("checked_subtract", expected_results["checked_subtract"], result)
 
-    result = soda_helper.call_contract_view('PrecompilesArythmeticTestsContract.sol', "getResult16")
+    result = soda_helper.call_contract_view('PrecompilesArythmeticTestsContract.sol', "getMulResult")
     check_expected_result("multiplication", expected_results["multiplication"], result)
+
+    result = soda_helper.call_contract_view('PrecompilesCheckedFuncsTestsContract.sol', "getMulResult")
+    check_expected_result("checked_multiplication", expected_results["multiplication"], result)
 
     result = soda_helper.call_contract_view('PrecompilesMiscellaneousTestsContract.sol', "getDivResult")
     check_expected_result("division", expected_results["division"], result)
@@ -383,6 +389,11 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
     tx_hash = test_multiplication(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "multiplication"
     expected_results["multiplication"] = a*b
+
+    # Test checked Multiplication
+    print("Run checked multiplication test...")
+    tx_hash = test_checked_multiplication(soda_helper, 'PrecompilesCheckedFuncsTestsContract.sol', a, b)
+    tx_hashes[tx_hash] = "checked_multiplication"
 
     # Test Division
     print("Run division test...")
@@ -549,9 +560,9 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
     tx_hashes[tx_hash] = "random"
 
     # test random bounded bits
-    # print("Run random Bounded Bits test...")
-    # tx_hash = test_randomBoundedBits(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', numBits)
-    # tx_hashes[tx_hash] = "random_bounded"
+    print("Run random Bounded Bits test...")
+    tx_hash = test_randomBoundedBits(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', numBits)
+    tx_hashes[tx_hash] = "random_bounded"
     
     tx_receipts = set()
     print(f"Wait for transaction receipts...")
@@ -581,7 +592,7 @@ def runTestVectors(soda_helper):
     print(f'\nTest Vector 1\n')
 
     #  test vector 1
-    run_tests(soda_helper, 100, 50, 10, True, 8, False, False, 80)
+    run_tests(soda_helper, 100, 2, 10, True, 8, False, False, 80)
 
 
 def main(provider_url: str):

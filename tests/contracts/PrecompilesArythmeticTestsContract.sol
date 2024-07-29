@@ -22,26 +22,12 @@ contract PrecompilesArythmeticTestsContract {
         gtUint16 res16_8;
     }
 
-    struct CheckMul16 {
-        gtUint32 res16_16;
-        gtUint32 res8_16;
-        gtUint32 res16_8;
-    }
-
     struct Check32 {
         gtUint32 res32_32;
         gtUint32 res8_32;
         gtUint32 res32_8;
         gtUint32 res16_32;
         gtUint32 res32_16;
-    }
-
-    struct CheckMul32 {
-        gtUint64 res32_32;
-        gtUint64 res8_32;
-        gtUint64 res32_8;
-        gtUint64 res16_32;
-        gtUint64 res32_16;
     }
 
     struct Check64 {
@@ -56,7 +42,7 @@ contract PrecompilesArythmeticTestsContract {
 
     uint8 addResult;
     uint8 subResult;
-    uint16 result16;
+    uint8 mulResult;
 
     function getAddResult() public view returns (uint8) {
         return addResult;
@@ -66,8 +52,8 @@ contract PrecompilesArythmeticTestsContract {
         return subResult;
     }
 
-    function getResult16() public view returns (uint16) {
-        return result16;
+    function getMulResult() public view returns (uint8) {
+        return mulResult;
     }
 
     function setPublicValues(AllGTCastingValues memory castingValues, uint8 a, uint8 b) public{
@@ -218,54 +204,53 @@ contract PrecompilesArythmeticTestsContract {
         return result;
     }
 
-    function mulTest(uint8 a, uint8 b) public returns (uint16) {
+    function mulTest(uint8 a, uint8 b) public returns (uint8) {
         AllGTCastingValues memory castingValues;
-        CheckMul16 memory checkMul16;
-        CheckMul32 memory checkMul32;
+        Check16 memory check16;
+        Check32 memory check32;
         Check64 memory check64;
         setPublicValues(castingValues, a, b);
         
         // Calculate the expected result 
-        result16 = MpcCore.decrypt(MpcCore.mul(castingValues.a8_s, castingValues.b8_s));
+        mulResult = MpcCore.decrypt(MpcCore.mul(castingValues.a8_s, castingValues.b8_s));
         
         // Calculate the result with casting to 16
-        checkMul16.res16_16 = MpcCore.mul(castingValues.a16_s, castingValues.b16_s);
-        checkMul16.res8_16 = MpcCore.mul(castingValues.a8_s, castingValues.b16_s);
-        checkMul16.res16_8 = MpcCore.mul(castingValues.a16_s, castingValues.b8_s);
-        require(result16 == MpcCore.decrypt(checkMul16.res16_16) && result16 == MpcCore.decrypt(checkMul16.res8_16)
-                && result16 == MpcCore.decrypt(checkMul16.res16_8), "mulTest: cast 16 failed");
+        check16.res16_16 = MpcCore.mul(castingValues.a16_s, castingValues.b16_s);
+        check16.res8_16 = MpcCore.mul(castingValues.a8_s, castingValues.b16_s);
+        check16.res16_8 = MpcCore.mul(castingValues.a16_s, castingValues.b8_s);
+        uint16 res16 = decryptAndCompareResults16(check16);
+        require(mulResult == res16, "mulTest: cast 16 failed");
         
         // Calculate the result with casting to 32
-        checkMul32.res32_32 = MpcCore.mul(castingValues.a32_s, castingValues.b32_s);
-        checkMul32.res8_32 = MpcCore.mul(castingValues.a8_s, castingValues.b32_s);
-        checkMul32.res32_8 = MpcCore.mul(castingValues.a32_s, castingValues.b8_s);
-        checkMul32.res16_32 = MpcCore.mul(castingValues.a16_s, castingValues.b32_s);
-        checkMul32.res32_16 = MpcCore.mul(castingValues.a32_s, castingValues.b16_s);
-        require(result16 == MpcCore.decrypt(checkMul32.res32_32) && result16 == MpcCore.decrypt(checkMul32.res8_32) 
-                && result16 == MpcCore.decrypt(checkMul32.res32_8) && result16 == MpcCore.decrypt(checkMul32.res32_16) 
-                && result16 == MpcCore.decrypt(checkMul32.res16_32), "mulTest: cast 32 failed");
+        check32.res32_32 = MpcCore.mul(castingValues.a32_s, castingValues.b32_s);
+        check32.res8_32 = MpcCore.mul(castingValues.a8_s, castingValues.b32_s);
+        check32.res32_8 = MpcCore.mul(castingValues.a32_s, castingValues.b8_s);
+        check32.res16_32 = MpcCore.mul(castingValues.a16_s, castingValues.b32_s);
+        check32.res32_16 = MpcCore.mul(castingValues.a32_s, castingValues.b16_s);
+        uint32 res32 = decryptAndCompareResults32(check32);
+        require(mulResult == res32, "mulTest: cast 32 failed");
         
         // Calculate the result with casting to 64
-        // check64.res64_64 = MpcCore.mul(castingValues.a64_s, castingValues.b64_s);
-        // check64.res8_64 = MpcCore.mul(castingValues.a8_s, castingValues.b64_s);
-        // check64.res64_8 = MpcCore.mul(castingValues.a64_s, castingValues.b8_s);
-        // check64.res16_64 = MpcCore.mul(castingValues.a16_s, castingValues.b64_s);
-        // check64.res64_16 = MpcCore.mul(castingValues.a64_s, castingValues.b16_s);
-        // check64.res32_64 = MpcCore.mul(castingValues.a32_s, castingValues.b64_s);
-        // check64.res64_32 = MpcCore.mul(castingValues.a64_s, castingValues.b32_s);
-        // uint64 res64 = decryptAndCompareResults64(check64);
-        // require(result16 == res64, "mulTest: cast 64 failed");
+        check64.res64_64 = MpcCore.mul(castingValues.a64_s, castingValues.b64_s);
+        check64.res8_64 = MpcCore.mul(castingValues.a8_s, castingValues.b64_s);
+        check64.res64_8 = MpcCore.mul(castingValues.a64_s, castingValues.b8_s);
+        check64.res16_64 = MpcCore.mul(castingValues.a16_s, castingValues.b64_s);
+        check64.res64_16 = MpcCore.mul(castingValues.a64_s, castingValues.b16_s);
+        check64.res32_64 = MpcCore.mul(castingValues.a32_s, castingValues.b64_s);
+        check64.res64_32 = MpcCore.mul(castingValues.a64_s, castingValues.b32_s);
+        uint64 res64 = decryptAndCompareResults64(check64);
+        require(mulResult == res64, "mulTest: cast 64 failed");
         
         // Check the result with scalar
-        require(result16 == MpcCore.decrypt(MpcCore.mul(a, castingValues.b8_s)) && result16 == MpcCore.decrypt(MpcCore.mul(castingValues.a8_s, b)),
+        require(mulResult == MpcCore.decrypt(MpcCore.mul(a, castingValues.b8_s)) && mulResult == MpcCore.decrypt(MpcCore.mul(castingValues.a8_s, b)),
                 "mulTest: test 8 bits with scalar failed");
-        require(result16 == MpcCore.decrypt(MpcCore.mul(a, castingValues.b16_s)) && result16 == MpcCore.decrypt(MpcCore.mul(castingValues.a16_s, b)),
+        require(mulResult == MpcCore.decrypt(MpcCore.mul(a, castingValues.b16_s)) && mulResult == MpcCore.decrypt(MpcCore.mul(castingValues.a16_s, b)),
                 "mulTest: test 16 bits with scalar failed");
-        require(result16 == MpcCore.decrypt(MpcCore.mul(a, castingValues.b32_s)) && result16 == MpcCore.decrypt(MpcCore.mul(castingValues.a32_s, b)),
+        require(mulResult == MpcCore.decrypt(MpcCore.mul(a, castingValues.b32_s)) && mulResult == MpcCore.decrypt(MpcCore.mul(castingValues.a32_s, b)),
                 "mulTest: test 32 bits with scalar failed");
-        // require(result16 == MpcCore.decrypt(MpcCore.mul(a, castingValues.b64_s)) && result16 == MpcCore.decrypt(MpcCore.mul(castingValues.a64_s, b)),
-        //         "mulTest: test 64 bits with scalar failed");
+        require(mulResult == MpcCore.decrypt(MpcCore.mul(a, castingValues.b64_s)) && mulResult == MpcCore.decrypt(MpcCore.mul(castingValues.a64_s, b)),
+                "mulTest: test 64 bits with scalar failed");
 
-        return result16;
+        return mulResult;
     }
 }

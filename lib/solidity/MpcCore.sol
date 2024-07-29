@@ -267,9 +267,15 @@ library MpcCore {
         return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
     }
 
-    function mul(gtUint8 a, gtUint8 b) internal returns (gtUint16) {
-         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(gtUint8 a, gtUint8 b) internal returns (gtUint8) {
+         return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function checkedMul(gtUint8 a, gtUint8 b) internal returns (gtUint8) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint8.unwrap(b));
+        return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
     }
 
     function div(gtUint8 a, gtUint8 b) internal returns (gtUint8) {
@@ -429,9 +435,16 @@ library MpcCore {
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
-    function mul(gtUint16 a, gtUint16 b) internal returns (gtUint32) {
-         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(gtUint16 a, gtUint16 b) internal returns (gtUint16) {
+        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function checkedMul(gtUint16 a, gtUint16 b) internal returns (gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint16.unwrap(b));
+
+        return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
     function div(gtUint16 a, gtUint16 b) internal returns (gtUint16) {
@@ -580,7 +593,7 @@ library MpcCore {
     }
 
     function sub(gtUint32 a, gtUint32 b) internal returns (gtUint32) {
-         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint32.unwrap(b)));
     }
 
@@ -591,13 +604,20 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
-    function mul(gtUint32 a, gtUint32 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(gtUint32 a, gtUint32 b) internal returns (gtUint32) {
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint32.unwrap(b)));
     }
 
+    function checkedMul(gtUint32 a, gtUint32 b) internal returns (gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint32.unwrap(b));
+        
+        return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
     function div(gtUint32 a, gtUint32 b) internal returns (gtUint32) {
-          return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Div(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint32.unwrap(b)));
     }
 
@@ -754,8 +774,15 @@ library MpcCore {
     }
 
     function mul(gtUint64 a, gtUint64 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function checkedMul(gtUint64 a, gtUint64 b) internal returns (gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint64.unwrap(b));
+
+        return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
     function div(gtUint64 a, gtUint64 b) internal returns (gtUint64) {
@@ -884,9 +911,16 @@ library MpcCore {
         return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
     }
 
-    function mul(uint8 a, gtUint8 b) internal returns (gtUint16) {
-         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(uint8 a, gtUint8 b) internal returns (gtUint8) {
+         return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), uint256(a), gtUint8.unwrap(b)));
+    }
+
+    function checkedMul(uint8 a, gtUint8 b) internal returns (gtUint8) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), uint256(a), gtUint8.unwrap(b));
+
+        return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
     }
 
     function div(uint8 a, gtUint8 b) internal returns (gtUint8) {
@@ -984,7 +1018,7 @@ library MpcCore {
     }
 
     function sub(uint16 a, gtUint16 b) internal returns (gtUint16) {
-         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), uint256(a), gtUint16.unwrap(b)));
     }
 
@@ -995,13 +1029,20 @@ library MpcCore {
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
-    function mul(uint16 a, gtUint16 b) internal returns (gtUint32) {
-         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(uint16 a, gtUint16 b) internal returns (gtUint16) {
+        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), uint256(a), gtUint16.unwrap(b)));
     }
 
+    function checkedMul(uint16 a, gtUint16 b) internal returns (gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), uint256(a), gtUint16.unwrap(b));
+
+        return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
     function div(uint16 a, gtUint16 b) internal returns (gtUint16) {
-          return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Div(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), uint256(a), gtUint16.unwrap(b)));
     }
 
@@ -1107,9 +1148,16 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
-    function mul(uint32 a, gtUint32 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(uint32 a, gtUint32 b) internal returns (gtUint32) {
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), uint256(a), gtUint32.unwrap(b)));
+    }
+
+    function checkedMul(uint32 a, gtUint32 b) internal returns (gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), uint256(a), gtUint32.unwrap(b));
+
+        return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
     function div(uint32 a, gtUint32 b) internal returns (gtUint32) {
@@ -1208,7 +1256,7 @@ library MpcCore {
     }
 
     function sub(uint64 a, gtUint64 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), uint256(a), gtUint64.unwrap(b)));
     }
 
@@ -1220,8 +1268,15 @@ library MpcCore {
     }
 
     function mul(uint64 a, gtUint64 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), uint256(a), gtUint64.unwrap(b)));
+    }
+
+    function checkedMul(uint64 a, gtUint64 b) internal returns (gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), uint256(a), gtUint64.unwrap(b));
+
+        return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
     function div(uint64 a, gtUint64 b) internal returns (gtUint64) {
@@ -1321,7 +1376,7 @@ library MpcCore {
     }
 
     function sub(gtUint8 a, uint8 b) internal returns (gtUint8) {
-         return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint8.unwrap(a), uint256(b)));
     }
 
@@ -1332,13 +1387,20 @@ library MpcCore {
         return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
     }
 
-    function mul(gtUint8 a, uint8 b) internal returns (gtUint16) {
-         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(gtUint8 a, uint8 b) internal returns (gtUint8) {
+        return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint8.unwrap(a), uint256(b)));
     }
 
+    function checkedMul(gtUint8 a, uint8 b) internal returns (gtUint8) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint8.unwrap(a), uint256(b));
+
+        return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
+    }
+
     function div(gtUint8 a, uint8 b) internal returns (gtUint8) {
-          return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Div(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint8.unwrap(a), uint256(b)));
     }
 
@@ -1432,7 +1494,7 @@ library MpcCore {
     }
 
     function sub(gtUint16 a, uint16 b) internal returns (gtUint16) {
-         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.RHS_PUBLIC), gtUint16.unwrap(a), uint256(b)));
     }
 
@@ -1443,13 +1505,20 @@ library MpcCore {
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
-    function mul(gtUint16 a, uint16 b) internal returns (gtUint32) {
-         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(gtUint16 a, uint16 b) internal returns (gtUint16) {
+        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.RHS_PUBLIC), gtUint16.unwrap(a), uint256(b)));
     }
 
+    function checkedMul(gtUint16 a, uint16 b) internal returns (gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.RHS_PUBLIC), gtUint16.unwrap(a), uint256(b));
+
+        return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
     function div(gtUint16 a, uint16 b) internal returns (gtUint16) {
-          return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Div(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.RHS_PUBLIC), gtUint16.unwrap(a), uint256(b)));
     }
 
@@ -1544,7 +1613,7 @@ library MpcCore {
     }
 
     function sub(gtUint32 a, uint32 b) internal returns (gtUint32) {
-         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.RHS_PUBLIC), gtUint32.unwrap(a), uint256(b)));
     }
 
@@ -1555,13 +1624,20 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
-    function mul(gtUint32 a, uint32 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(gtUint32 a, uint32 b) internal returns (gtUint32) {
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.RHS_PUBLIC), gtUint32.unwrap(a), uint256(b)));
     }
 
+    function checkedMul(gtUint32 a, uint32 b) internal returns (gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.RHS_PUBLIC), gtUint32.unwrap(a), uint256(b));
+
+        return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
     function div(gtUint32 a, uint32 b) internal returns (gtUint32) {
-          return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Div(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.RHS_PUBLIC), gtUint32.unwrap(a), uint256(b)));
     }
 
@@ -1655,7 +1731,7 @@ library MpcCore {
     }
 
     function sub(gtUint64 a, uint64 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b)));
     }
 
@@ -1667,8 +1743,15 @@ library MpcCore {
     }
 
     function mul(gtUint64 a, uint64 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b)));
+    }
+
+    function checkedMul(gtUint64 a, uint64 b) internal returns (gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b));
+
+        return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
     function div(gtUint64 a, uint64 b) internal returns (gtUint64) {
@@ -2209,14 +2292,28 @@ library MpcCore {
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
-    function mul(gtUint8 a, gtUint16 b) internal returns (gtUint32) {
-         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(gtUint8 a, gtUint16 b) internal returns (gtUint16) {
+        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint16.unwrap(b)));
     }
 
-    function mul(gtUint16 a, gtUint8 b) internal returns (gtUint32) {
-         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(gtUint16 a, gtUint8 b) internal returns (gtUint16) {
+        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function checkedMul(gtUint8 a, gtUint16 b) internal returns (gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint16.unwrap(b));
+
+        return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
+    function checkedMul(gtUint16 a, gtUint8 b) internal returns (gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint8.unwrap(b));
+
+        return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
     function div(gtUint8 a, gtUint16 b) internal returns (gtUint16) {
@@ -2534,14 +2631,28 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
-    function mul(gtUint8 a, gtUint32 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(gtUint8 a, gtUint32 b) internal returns (gtUint32) {
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint32.unwrap(b)));
     }
 
-    function mul(gtUint32 a, gtUint8 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(gtUint32 a, gtUint8 b) internal returns (gtUint32) {
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function checkedMul(gtUint8 a, gtUint32 b) internal returns (gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint32.unwrap(b));
+
+        return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedMul(gtUint32 a, gtUint8 b) internal returns (gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint8.unwrap(b));
+
+        return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
     function div(gtUint8 a, gtUint32 b) internal returns (gtUint32) {
@@ -2944,14 +3055,28 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
-    function mul(gtUint16 a, gtUint32 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(gtUint16 a, gtUint32 b) internal returns (gtUint32) {
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint32.unwrap(b)));
     }
 
-    function mul(gtUint32 a, gtUint16 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+    function mul(gtUint32 a, gtUint16 b) internal returns (gtUint32) {
+        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function checkedMul(gtUint16 a, gtUint32 b) internal returns (gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint32.unwrap(b));
+
+        return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedMul(gtUint32 a, gtUint16 b) internal returns (gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint16.unwrap(b));
+
+        return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
     function div(gtUint16 a, gtUint32 b) internal returns (gtUint32) {
@@ -3372,6 +3497,20 @@ library MpcCore {
     function mul(gtUint64 a, gtUint8 b) internal returns (gtUint64) {
          return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function checkedMul(gtUint8 a, gtUint64 b) internal returns (gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint64.unwrap(b));
+
+        return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedMul(gtUint64 a, gtUint8 b) internal returns (gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint8.unwrap(b));
+
+        return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
     function div(gtUint8 a, gtUint64 b) internal returns (gtUint64) {
@@ -3916,13 +4055,27 @@ library MpcCore {
     }
 
     function mul(gtUint16 a, gtUint64 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint64.unwrap(b)));
     }
 
     function mul(gtUint64 a, gtUint16 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function checkedMul(gtUint16 a, gtUint64 b) internal returns (gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint64.unwrap(b));
+
+        return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedMul(gtUint64 a, gtUint16 b) internal returns (gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint16.unwrap(b));
+
+        return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
     function div(gtUint16 a, gtUint64 b) internal returns (gtUint64) {
@@ -4447,13 +4600,27 @@ library MpcCore {
     }
 
     function mul(gtUint32 a, gtUint64 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint64.unwrap(b)));
     }
 
     function mul(gtUint64 a, gtUint32 b) internal returns (gtUint64) {
-         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function checkedMul(gtUint32 a, gtUint64 b) internal returns (gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint64.unwrap(b));
+
+        return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedMul(gtUint64 a, gtUint32 b) internal returns (gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint32.unwrap(b));
+
+        return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
     function div(gtUint32 a, gtUint64 b) internal returns (gtUint64) {
