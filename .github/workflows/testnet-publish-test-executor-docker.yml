@@ -1,0 +1,78 @@
+name: Build and push precompiles test Docker Image to ECR
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_name:
+        description: 'Enter the Docker image name'
+        required: true
+        default: 'precompiles-test'
+      image_tag:
+        description: 'Enter the Docker image tag'
+        required: false
+        default: 'latest'
+      region:
+        description: 'Enter the AWS region'
+        required: true
+        default: 'us-east-1'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: testnet-precompile-test-docker
+
+      - name: Setup SSH Key for sodalib
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SODA_LIB }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          # Start the SSH agent and add the key
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Update sodalib submodule
+        run: |
+          git submodule update --init sodalib 
+          git submodule update --remote sodalib # get the latest commit
+
+      - name: Set up environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev build-essential
+
+
+      - name: Set up Docker Build
+        uses: docker/setup-buildx-action@v1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ github.event.inputs.region }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        run: |
+          aws ecr get-login-password --region ${{ github.event.inputs.region }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ github.event.inputs.region }}.amazonaws.com
+
+      - name: Create ECR repositories if not exist
+        run: |
+          aws ecr describe-repositories --repository-names "${{ github.event.inputs.image_name }}" --region ${{ github.event.inputs.region }} || aws ecr create-repository --repository-name "${{ github.event.inputs.image_name }}" --region ${{ github.event.inputs.region }}
+          
+
+      - name: Build, tag, and push flood test Docker image
+        env:
+          ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ github.event.inputs.region }}.amazonaws.com
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+          IMAGE_NAME: ${{ github.event.inputs.image_name }}
+        run: |
+          docker build -t $IMAGE_NAME:$IMAGE_TAG -f Dockerfile.precompiles .
+          docker tag $IMAGE_NAME:$IMAGE_TAG $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
