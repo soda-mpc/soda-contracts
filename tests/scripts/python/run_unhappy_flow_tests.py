@@ -6,12 +6,12 @@ import sys
 sys.path.append('soda-sdk')
 from python.crypto import generate_rsa_keypair, sign, recover_user_key, prepare_delete_key_signature, prepare_IT
 
-FILE_NAME = 'GetUserKeyContract.sol'
-FILE_PATH = 'onboardUser/contracts/'
 SIGNATURE_SIZE = 65
 
 SOLIDITY_FILES = ['onboardUser/contracts/GetUserKeyContract.sol',
-                  'tests/contracts/PrecompilesMiscellaneous1TestsContract.sol']
+                  'tests/contracts/PrecompilesMiscellaneous1TestsContract.sol',
+                  'tests/contracts/PrecompilesOffboardToUserKeyTestContract.sol',
+                  'tests/contracts/MalformedInputs.sol']
 
 def getUserKeyShares(account, contract, receipt):
     """
@@ -101,7 +101,7 @@ def methodNotFoundTest(signing_key, soda_helper, contract_str, account):
 
 def errorVerifyingSignatureTest(signing_key, soda_helper, conrtact_str):
     # Generate new RSA key pair and signature on the public key
-    private_key, public_key, signature = generateRSAKeysAndSignature(signing_key)
+    _, public_key, signature = generateRSAKeysAndSignature(signing_key)
 
     # change the signature last byte to 0x00
     wrong_signature = b'\x10' + signature[1:]
@@ -117,7 +117,49 @@ def errorVerifyingSignatureTest(signing_key, soda_helper, conrtact_str):
     else:
         raise ValueError(f'Test errorVerifyingSignature did not revert')
     
-def invalidSignatureTest(signing_key, soda_helper, contract_str, account):
+
+def errorEmptyInput_getUserKeyTest(signing_key, soda_helper, conrtact_str):
+    # Generate new RSA key pair and signature on the public key
+    _, public_key, signature = generateRSAKeysAndSignature(signing_key)
+
+    # Create an empty input
+    empty = bytes(0)
+
+    # Call the getUserKey function to get the encrypted AES shares
+    receipt = soda_helper.call_contract_transaction(conrtact_str, "getUserKey", func_args=[public_key, empty])
+    
+    if receipt is None:
+        raise Exception("Failed to call the transaction function")
+    
+    if receipt.status == 0:
+        print(f'Test empty signature in getUserKey reverted as expected')
+    else:
+        raise ValueError(f'Test empty signature in getUserKey did not revert')
+    
+    # Call the getUserKey function to get the encrypted AES shares
+    receipt = soda_helper.call_contract_transaction(conrtact_str, "getUserKey", func_args=[empty, empty])
+    
+    if receipt is None:
+        raise Exception("Failed to call the transaction function")
+    
+    if receipt.status == 0:
+        print(f'Test empty signature and ct in getUserKey reverted as expected')
+    else:
+        raise ValueError(f'Test empty signature and ct in getUserKey did not revert')
+    
+
+    # Call the getUserKey function to get the encrypted AES shares
+    receipt = soda_helper.call_contract_transaction(conrtact_str, "getUserKey", func_args=[empty, signature])
+    
+    if receipt is None:
+        raise Exception("Failed to call the transaction function")
+    
+    if receipt.status == 0:
+        print(f'Test empty ct in getUserKey reverted as expected')
+    else:
+        raise ValueError(f'Test empty ct in getUserKey did not revert')
+    
+def invalidSignatureTest(signing_key, soda_helper, contract_str):
     user_key_hex = os.environ.get('USER_KEY')
     user_aes_key = bytes.fromhex(user_key_hex)  
     
@@ -146,6 +188,75 @@ def invalidSignatureTest(signing_key, soda_helper, contract_str, account):
         print(f'Test invalidSignature reverted as expected')
     else:
         raise ValueError(f'Test invalidSignature did not revert')
+
+def emptyInput_validateCiphertextTest(signing_key, soda_helper, contract_str):
+    user_key_hex = os.environ.get('USER_KEY')
+    user_aes_key = bytes.fromhex(user_key_hex)  
+    
+    dummyCT = 0
+    dummySignature = bytes(65)
+    contract = soda_helper.get_contract(contract_str)
+    function = contract.functions.validateCiphertextTest(dummyCT, dummyCT, dummyCT, dummyCT, dummySignature)
+    func_sig = get_function_signature(function.abi) # Get the function signature
+    
+    # Prepare the input text for the function
+    ct, signature = prepare_IT(5, user_aes_key, Account.from_key(signing_key), contract, func_sig, bytes.fromhex(signing_key[2:]))
+    
+    # Create an empty signature
+    empty_signature = bytes(0)
+
+    receipt = soda_helper.call_contract_transaction(contract_str, "validateCiphertextTest", func_args=[ct, ct, ct, ct, empty_signature])
+    
+    if receipt is None:
+        raise Exception("Failed to call the transaction function")
+    
+    if receipt.status == 0:
+        print(f'Test empty signature in validateCiphertext reverted as expected')
+    else:
+        raise ValueError(f'Test empty signature in validateCiphertext did not revert')
+    
+    # Create an empty ct
+    empty_ct = int(0)
+
+    receipt = soda_helper.call_contract_transaction(contract_str, "validateCiphertextTest", func_args=[empty_ct, empty_ct, empty_ct, empty_ct, empty_signature])
+    
+    if receipt is None:
+        raise Exception("Failed to call the transaction function")
+    
+    if receipt.status == 0:
+        print(f'Test empty signature and ct in validateCiphertext reverted as expected')
+    else:
+        raise ValueError(f'Test empty signature and ct in validateCiphertext did not revert')
+    
+    receipt = soda_helper.call_contract_transaction(contract_str, "validateCiphertextTest", func_args=[empty_ct, empty_ct, empty_ct, empty_ct, signature])
+    
+    if receipt is None:
+        raise Exception("Failed to call the transaction function")
+    
+    if receipt.status == 0:
+        print(f'Test empty ct in validateCiphertext reverted as expected')
+    else:
+        raise ValueError(f'Test empty ct in validateCiphertext did not revert')
+    
+def malformedInputToDecryptTest(soda_helper, contract_str):
+
+    receipt = soda_helper.call_contract_transaction(contract_str, "malformedLargeInputDecrypt")
+    if receipt is None:
+        raise Exception("Failed to call the transaction function")
+    
+    if receipt.status == 0:
+        print(f'Test malformed large inputs to decrypt reverted as expected')
+    else:
+        raise ValueError(f'Test malformed large inputs to decrypt did not revert')
+    
+    receipt = soda_helper.call_contract_transaction(contract_str, "malformedSmallInputDecrypt")
+    if receipt is None:
+        raise Exception("Failed to call the transaction function")
+    
+    if receipt.status == 0:
+        print(f'Test malformed small inputs to decrypt reverted as expected')
+    else:
+        raise ValueError(f'Test malformed small inputs to decrypt did not revert')
     
 
 def main(provider_url: str):
@@ -170,13 +281,20 @@ def main(provider_url: str):
     # Check revert on 'method not found' error
     methodNotFoundTest(signing_key, soda_helper, SOLIDITY_FILES[0], account)
 
-    # Check revert on 'error verifying signature' error
+    # Check revert on 'error verifying signature' error in getUserKey function
     errorVerifyingSignatureTest(signing_key, soda_helper, SOLIDITY_FILES[0])
 
-    # Check revert on 'invalid signature' error
-    invalidSignatureTest(signing_key, soda_helper, SOLIDITY_FILES[1], account)
-    
+    # Check revert on 'invalid signature' error in validateCiphertext function
+    invalidSignatureTest(signing_key, soda_helper, SOLIDITY_FILES[1])
 
+    # Check revert on empty signature or ct in validateCiphertext function
+    emptyInput_validateCiphertextTest(signing_key, soda_helper, SOLIDITY_FILES[1])
+
+    # Check revert on empty signature or ct in getUserKey function
+    errorEmptyInput_getUserKeyTest(signing_key, soda_helper, SOLIDITY_FILES[0])
+    
+    # Check revert on wrong input size
+    malformedInputToDecryptTest(soda_helper, 'tests/contracts/MalformedInputs.sol')
 
 if __name__ == "__main__":
     url = parse_url_parameter()
