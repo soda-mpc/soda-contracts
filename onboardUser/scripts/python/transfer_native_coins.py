@@ -31,10 +31,10 @@ if __name__ == "__main__":
     parser.add_argument('sender_account_key', type=str, help='The private key of the sender account')
     parser.add_argument('provider_url', type=str, help='The node url')
     args = parser.parse_args()
+    url = args.provider_url
     if args.provider_url == "Local":
-        main(args.sender_account_key, LOCAL_PROVIDER_URL)
+        url = LOCAL_PROVIDER_URL
     elif args.provider_url == "Remote":
-        main(args.sender_account_key, REMOTE_HTTP_PROVIDER_URL)
-    else:
-        print("Invalid provider url")
+        url = REMOTE_HTTP_PROVIDER_URL
+    main(args.sender_account_key, url)
 

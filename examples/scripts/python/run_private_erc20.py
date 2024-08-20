@@ -3,9 +3,12 @@ from eth_account import Account
 import sys
 sys.path.append('soda-sdk')
 from python.crypto import prepare_IT
-from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter, decrypt_value_int, get_function_signature
+from lib.python.soda_web3_helper import (SodaWeb3Helper, decrypt_value_int, get_function_signature, LOCAL_PROVIDER_URL,
+                                         REMOTE_HTTP_PROVIDER_URL)
 from web3.exceptions import TransactionNotFound
 from time import sleep
+import logging
+import argparse
 
 FILE_NAME = 'PrivateERC20Contract.sol'
 FILE_PATH = 'examples/contracts/'
@@ -75,8 +78,7 @@ def check_expected_result(name, expected_result, result):
     else:
         raise ValueError(f'Test {name} failed. Expected: {expected_result}, Actual: {result}')
 
-
-def main(provider_url: str):
+def main(provider_url: str, use_eip191_signature: bool):
     # Get the account private key from the environment variable
     private_key = os.environ.get('SIGNING_KEY')
     account = Account.from_key(private_key)
@@ -139,7 +141,7 @@ def main(provider_url: str):
     function = contract.functions.transfer(alice_address.address, dummyCT, dummySignature, False)
     func_sig = get_function_signature(function.abi) # Get the function signature
     # Prepare the input text for the function
-    ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]))
+    ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]), use_eip191_signature)
     # Create the real function using the prepared IT
     function = contract.functions.transfer(alice_address.address, ct, signature, False)
     # Transfer 5 SOD to Alice
@@ -171,7 +173,7 @@ def main(provider_url: str):
     function = contract.functions.transferFrom(account.address, alice_address.address, dummyCT, dummySignature, False) # Dummy function
     func_sig = get_function_signature(function.abi) # Get the function signature
     # Prepare the input text for the function
-    ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]))
+    ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]), use_eip191_signature)
     # Create the real function using the prepared IT
     function = contract.functions.transferFrom(account.address, alice_address.address, ct, signature, False)
     tx_hash = execute_transaction(soda_helper, account, contract, function)
@@ -192,6 +194,20 @@ def main(provider_url: str):
 
 
 if __name__ == "__main__":
-    url = parse_url_parameter()
-    if url is not None:
-        main(url)
+    parser = argparse.ArgumentParser(description='onboard user parameters')
+    parser.add_argument('provider_url', type=str, help='The provider url')
+    parser.add_argument('--use_eip191_signature', type=bool, default=False, help='To use EIP191 signature')
+    args = parser.parse_args()
+
+    url = args.provider_url
+    if args.provider_url == "Local":
+        url = LOCAL_PROVIDER_URL
+    elif args.provider_url == "Remote":
+        url = REMOTE_HTTP_PROVIDER_URL
+
+    try:
+        main(url, args.use_eip191_signature)
+    except Exception as e:
+        logging.error("An error occurred: %s", e)
+        raise e
+
