@@ -3,10 +3,11 @@ from eth_account import Account
 import sys
 sys.path.append('soda-sdk')
 from python.crypto import decrypt, prepare_IT, block_size
-from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
+from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL, REMOTE_HTTP_PROVIDER_URL
 from web3.exceptions import TransactionNotFound
 from time import sleep
 import logging
+import argparse
 
 FILE_NAME = 'PrivateERC20Contract.sol'
 FILE_PATH = 'examples/contracts/'
@@ -14,7 +15,7 @@ INITIAL_BALANCE = 500000000
 NONCE = 0
 
 def decrypt_value(my_CTBalance, user_key):
-    
+
     # Convert ct to bytes (big-endian)
     byte_array = my_CTBalance.to_bytes(32, byteorder='big')
 
@@ -29,7 +30,7 @@ def decrypt_value(my_CTBalance, user_key):
     decrypted_balance = int.from_bytes(decrypted_message, 'big')
 
     return decrypted_balance
-    
+
 
 def get_function_signature(function_abi):
     # Extract the input types from the ABI
@@ -48,7 +49,7 @@ def get_encrypted_balance(soda_helper, account, contract):
     for event in balance_events:
         if event['args']['_owner'].lower() == account.address.lower():
             return event['args']['_balance']
-    
+
     raise Exception("Failed to find balance of the account address in the transaction receipt.")
     return None
 
@@ -59,7 +60,7 @@ def execute_transaction(soda_helper, account, contract, function):
     return tx_hash
 
 def check_balance(soda_helper, account, contract, user_key, name, expected_balance):
-    
+
     # Get my encrypted balance, decrypt it and check if it matches the expected value
     my_CTBalance = get_encrypted_balance(soda_helper, account, contract)
     my_balance = decrypt_value(my_CTBalance, user_key)
@@ -79,7 +80,7 @@ def check_allowance(soda_helper, account, contract, user_key, expected_allowance
     for event in allowance_events:
         if event['args']['_owner'].lower() == account.address.lower():
             allowanceCT = event['args']['_allowance']
-    
+
     if allowanceCT is None:
         raise Exception("Failed to find the allowance of the account address in the transaction receipt.")
 
@@ -92,7 +93,7 @@ def check_expected_result(name, expected_result, result):
     else:
         raise ValueError(f'Test {name} failed. Expected: {expected_result}, Actual: {result}')
 
-def main(provider_url: str):
+def main(provider_url: str, use_eip191_signature: bool):
     # Get the account private key from the environment variable
     private_key = os.environ.get('SIGNING_KEY')
     account = Account.from_key(private_key)
@@ -128,7 +129,7 @@ def main(provider_url: str):
     print("Function call result totalSupply:", totalSupply)
 
     user_key_hex = os.environ.get('USER_KEY')
-    user_key = bytes.fromhex(user_key_hex)  
+    user_key = bytes.fromhex(user_key_hex)
 
     # Generate a new Ethereum account for Alice
     alice_address = Account.create()
@@ -146,7 +147,7 @@ def main(provider_url: str):
     execute_transaction(soda_helper, account, contract, function)
 
     print("************* Transfer IT ", plaintext_integer, " to Alice *************")
-    # In order to generate the input text, we need to use some data of the function. 
+    # In order to generate the input text, we need to use some data of the function.
     # For example, the address of the user, the address of the contract and also the function signature.
     # To simplify the process of obtaining the function signature, we use a dummy function with placeholder inputs.
     # After the signature is generated, we call prepare input text function and get the input text to use in the real function.
@@ -155,7 +156,7 @@ def main(provider_url: str):
     function = contract.functions.transfer(alice_address.address, dummyCT, dummySignature, False)
     func_sig = get_function_signature(function.abi) # Get the function signature
     # Prepare the input text for the function
-    ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]))
+    ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]), use_eip191_signature)
     # Create the real function using the prepared IT
     function = contract.functions.transfer(alice_address.address, ct, signature, False)
     # Transfer 5 SOD to Alice
@@ -187,11 +188,10 @@ def main(provider_url: str):
     function = contract.functions.transferFrom(account.address, alice_address.address, dummyCT, dummySignature, False) # Dummy function
     func_sig = get_function_signature(function.abi) # Get the function signature
     # Prepare the input text for the function
-    ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]))
+    ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]), use_eip191_signature)
     # Create the real function using the prepared IT
     function = contract.functions.transferFrom(account.address, alice_address.address, ct, signature, False)
     tx_hash = execute_transaction(soda_helper, account, contract, function)
-
     tx_receipt = None
     while tx_receipt is None:
         try:
@@ -208,12 +208,20 @@ def main(provider_url: str):
     check_allowance(soda_helper, account, contract, user_key, plaintext_integer*7)
 
 
-
 if __name__ == "__main__":
-    url = parse_url_parameter()
-    if (url is not None):
-        try:
-            main(url)
-        except Exception as e:
-            logging.error("An error occurred: %s", e)
-            raise e
+    parser = argparse.ArgumentParser(description='onboard user parameters')
+    parser.add_argument('provider_url', type=str, help='The provider url')
+    parser.add_argument('--use_eip191_signature', type=bool, default=False, help='To use EIP191 signature')
+    args = parser.parse_args()
+
+    url = args.provider_url
+    if args.provider_url == "Local":
+        url = LOCAL_PROVIDER_URL
+    elif args.provider_url == "Remote":
+        url = REMOTE_HTTP_PROVIDER_URL
+
+    try:
+        main(url, args.use_eip191_signature)
+    except Exception as e:
+        logging.error("An error occurred: %s", e)
+        raise e

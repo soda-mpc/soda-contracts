@@ -1,6 +1,12 @@
 import fs from 'fs';
 import { block_size, decrypt, prepareIT, hexBase } from '../../../soda-sdk/js/crypto.js';
-import {SodaWeb3Helper, parseURLParameter} from '../../../lib/js/sodaWeb3Helper.mjs';
+import {
+    SodaWeb3Helper,
+    LOCAL_PROVIDER_URL,
+    REMOTE_HTTP_PROVIDER_URL
+} from '../../../lib/js/sodaWeb3Helper.mjs';
+import yargs from "yargs";
+import {hideBin} from "yargs/helpers";
 
 const FILE_NAME = 'PrivateERC20Contract.sol';
 const FILE_PATH = 'examples/contracts/';
@@ -102,17 +108,39 @@ async function checkAllowance(sodaHelper, account, contract, user_key, expectedA
 }
 
 async function main() {
+    const argv = yargs(hideBin(process.argv))
+      .usage('Usage: node $0 <provider_url> [options]')
+      .demandCommand(1, 'You must provide the provider_url as a positional argument.')
+      .option('use_eip191_signature', {
+          alias: 'eip191',
+          type: 'boolean',
+          default: false,
+          describe: 'To use EIP191 signature',
+      })
+      .help('h')
+      .alias('h', 'help')
+      .parseSync();
 
-    const provider_url = parseURLParameter();
-    if (provider_url === null) {
-        return
+    let providerURL = argv._[0];
+
+    switch (argv._[0]) {
+        case 'Local':
+            providerURL = LOCAL_PROVIDER_URL;
+            break;
+        case 'Remote':
+            providerURL = REMOTE_HTTP_PROVIDER_URL;
+            break;
     }
+
+    console.log("Use EIP191 Signature:", argv["use_eip191_signature"]);
+    console.log("Provider URL:", providerURL);
+    const useEIP191 = argv["use_eip191_signature"]
 
     // Get the private key from the environment variable
     const SIGNING_KEY = process.env.SIGNING_KEY;
     // Create helper function using the private key
-    const sodaHelper = new SodaWeb3Helper(SIGNING_KEY, provider_url);
-    
+    const sodaHelper = new SodaWeb3Helper(SIGNING_KEY, providerURL);
+
     // compile the onboard solidity contract
     const success = sodaHelper.setupContract(FILE_PATH, FILE_NAME, "private_erc20");
     if (!success){
@@ -172,7 +200,7 @@ async function main() {
     func = contract.methods.transfer(alice_address.address, dummyCT, dummySignature, false); // Create dummy function to get the signature for prepare input text
     let hashFuncSig = getFunctionSignature(func);
     // After the function signature is obtained, prepare the input test for the function
-    let {ctInt, signature} = prepareIT(plaintext_integer, user_key, account.address, contract.options.address, hashFuncSig, Buffer.from(SIGNING_KEY.slice(2), 'hex'));
+    let {ctInt, signature} = prepareIT(plaintext_integer, user_key, account.address, contract.options.address, hashFuncSig, Buffer.from(SIGNING_KEY.slice(2), 'hex'), useEIP191);
     // Create the real function using the prepared IT
     func = contract.methods.transfer(alice_address.address, ctInt, signature, false);
     // Transfer 5 SOD to Alice
@@ -204,7 +232,7 @@ async function main() {
     // Transfer 5 SOD to Alice
     func = contract.methods.transferFrom(account.address, alice_address.address, dummyCT, dummySignature, false);
     hashFuncSig = getFunctionSignature(func);
-    ({ctInt, signature} = prepareIT(plaintext_integer, user_key, account.address, contract.options.address, hashFuncSig, Buffer.from(SIGNING_KEY.slice(2), 'hex')));
+    ({ctInt, signature} = prepareIT(plaintext_integer, user_key, account.address, contract.options.address, hashFuncSig, Buffer.from(SIGNING_KEY.slice(2), 'hex'), useEIP191));
     // Create the real function using the prepared IT output
     func = contract.methods.transferFrom(account.address, alice_address.address, ctInt, signature, false);
     const tx_hash = await execute_transaction(sodaHelper, func, contract)
