@@ -254,14 +254,14 @@ def checkResults(soda_helper, expected_results, private_key):
     result = soda_helper.call_contract_view('PrecompilesBitwiseTestsContract.sol', "getXorResult")
     check_expected_result("xor", expected_results["xor"], result)
 
-    # result8, result16, result32, result64 = soda_helper.call_contract_view('PrecompilesShiftTestsContract.sol', "getAllShiftResults")
-    # check_expected_result("bitwise shift left 8", expected_results["shift_left8"], result8)
-    # check_expected_result("bitwise shift left 16", expected_results["shift_left16"], result16)
-    # check_expected_result("bitwise shift left 32", expected_results["shift_left32"], result32)
-    # check_expected_result("bitwise shift left 64", expected_results["shift_left64"], result64)
+    result8, result16, result32, result64 = soda_helper.call_contract_view('PrecompilesShiftTestsContract.sol', "getAllShiftResults")
+    check_expected_result("bitwise shift left 8", expected_results["shift_left8"], result8)
+    check_expected_result("bitwise shift left 16", expected_results["shift_left16"], result16)
+    check_expected_result("bitwise shift left 32", expected_results["shift_left32"], result32)
+    check_expected_result("bitwise shift left 64", expected_results["shift_left64"], result64)
 
-    # result = soda_helper.call_contract_view('PrecompilesShiftTestsContract.sol', "getResult")
-    # check_expected_result("bitwise shift right", expected_results["shift_right"], result)
+    result = soda_helper.call_contract_view('PrecompilesShiftTestsContract.sol', "getResult")
+    check_expected_result("bitwise shift right", expected_results["shift_right"], result)
 
     result = soda_helper.call_contract_view('PrecompilesMinMaxTestsContract.sol', "getMinResult")
     check_expected_result("min", expected_results["min"], result)
@@ -444,18 +444,20 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
     expected_results["xor"] = a ^ b
 
     # Test Bitwise Shift Left
-    # print("Run shift left test...")
-    # test_bitwise_shift_left(soda_helper, 'PrecompilesShiftTestsContract.sol', a, shift) 
+    print("Run shift left test...")
+    tx_hash = test_bitwise_shift_left(soda_helper, 'PrecompilesShiftTestsContract.sol', a, shift) 
+    tx_hashes[tx_hash] = "shl"
     # Calculate the result in 8, 16, 32, and 64 bit
-    # expected_results["shift_left8"] = (a << shift) & 0xFF
-    # expected_results["shift_left16"] = (a << shift) & 0xFFFF
-    # expected_results["shift_left32"] = (a << shift) & 0xFFFFFFFF
-    # expected_results["shift_left64"] = (a << shift) & 0xFFFFFFFFFFFFFFFF
+    expected_results["shift_left8"] = (a << shift) & 0xFF
+    expected_results["shift_left16"] = (a << shift) & 0xFFFF
+    expected_results["shift_left32"] = (a << shift) & 0xFFFFFFFF
+    expected_results["shift_left64"] = (a << shift) & 0xFFFFFFFFFFFFFFFF
 
-    # # Test Bitwise Shift Right
-    # print("Run shift right test...")
-    # test_bitwise_shift_right(soda_helper, 'PrecompilesShiftTestsContract.sol', a, shift, a >> shift)
-    # expected_results["shift_right"] = a >> shift
+    # Test Bitwise Shift Right
+    print("Run shift right test...")
+    tx_hash = test_bitwise_shift_right(soda_helper, 'PrecompilesShiftTestsContract.sol', a, shift)
+    tx_hashes[tx_hash] = "shr"
+    expected_results["shift_right"] = a >> shift
 
     # Test Min
     print("Run min test...")
