@@ -1,0 +1,21 @@
+# Use an official lightweight Ubuntu base image
+FROM python:3.9-slim
+
+
+# Install software properties common (to add PPAs) and other necessary tools
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Install Solidity
+RUN SOLC_VERSION="0.8.19" && \
+    curl -L https://github.com/ethereum/solidity/releases/download/v${SOLC_VERSION}/solc-static-linux -o /usr/local/bin/solc && \
+    chmod +x /usr/local/bin/solc
+
+# Set up a working directory to run commands and copy files into
+WORKDIR /app
+
+# Optionally, if you have a requirements.txt, copy it into the image
+COPY . .
+
+RUN pip install --no-cache -r requirements.txt
+
+CMD ["./runTestsInLoop.sh"]

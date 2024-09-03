@@ -5,6 +5,7 @@ from lib.python.soda_web3_helper import SodaWeb3Helper, DEFAULT_GAS_PRICE, LOCAL
 import argparse
 
 def transfer_to_account(sender_account_key, receiver_account, provider_url):
+    print(f"Sender account key: {sender_account_key}")
     soda_helper = SodaWeb3Helper(sender_account_key, provider_url)
     sender_balance = soda_helper.get_native_currency_balance(soda_helper.account.address)
     original_receiver_balance = soda_helper.get_native_currency_balance(receiver_account.address)
@@ -30,10 +31,12 @@ if __name__ == "__main__":
     parser.add_argument('sender_account_key', type=str, help='The private key of the sender account')
     parser.add_argument('provider_url', type=str, help='The node url')
     args = parser.parse_args()
+    print(f'Provider URL: {args.provider_url}')
+    if not args.provider_url:
+        raise ValueError("Please provide the provider url")
     if args.provider_url == "Local":
         main(args.sender_account_key, LOCAL_PROVIDER_URL)
     elif args.provider_url == "Remote":
         main(args.sender_account_key, REMOTE_HTTP_PROVIDER_URL)
     else:
-        print("Invalid provider url")
-
+        main(args.sender_account_key, args.provider_url)

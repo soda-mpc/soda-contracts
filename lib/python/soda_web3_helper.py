@@ -19,12 +19,16 @@ def parse_url_parameter():
     parser = argparse.ArgumentParser(description='Get URL')
     parser.add_argument('provider_url', type=str, help='The provider url')
     args = parser.parse_args()
+    print(f'Provider URL: {args.provider_url}')
+
+    if not args.provider_url:
+        raise Exception("No URL provided")
     if args.provider_url == "Local":
         return LOCAL_PROVIDER_URL
     elif args.provider_url == "Remote":
         return REMOTE_HTTP_PROVIDER_URL
     else:
-        raise ValueError("Invalid provider url")
+        return args.provider_url
 
 class SodaWeb3Helper:
     def __init__(self, private_key_string, http_provider_url):

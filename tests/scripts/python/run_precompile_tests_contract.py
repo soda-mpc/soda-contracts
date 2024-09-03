@@ -210,6 +210,28 @@ def test_validate_ciphertext(soda_helper, contract_str, a):
     ct, signature = prepare_IT(a, user_aes_key, Account.from_key(sign_key), contract, func_sig, bytes.fromhex(sign_key[2:]))
     return execute_transaction_with_gas_estimation("validate ciphertext", soda_helper, contract_str, "validateCiphertextTest", func_args=[ct, ct, ct, ct, signature])
 
+
+def test_validate_ciphertext_eip191(soda_helper, contract_str, a):
+    user_key_hex = os.environ.get('USER_KEY')
+    user_aes_key = bytes.fromhex(user_key_hex)
+    sign_key = os.environ.get('SIGNING_KEY')
+
+    # In order to generate the input text, we need to use some data of the function.
+    # For example, the address of the user, the address of the contract and also the function signature.
+    # To simplify the process of obtaining the function signature, we use a dummy function with placeholder inputs.
+    # After the signature is generated, we call prepare input text function and get the input text to use in the real function.
+    dummyCT = 0
+    dummySignature = bytes(65)
+    contract = soda_helper.get_contract(contract_str)
+    function = contract.functions.validateCiphertextTest(dummyCT, dummyCT, dummyCT, dummyCT, dummySignature)
+    func_sig = get_function_signature(function.abi)  # Get the function signature
+    # Prepare the input text for the function
+    ct, signature = prepare_IT(a, user_aes_key, Account.from_key(sign_key), contract, func_sig,
+                               bytes.fromhex(sign_key[2:]), eip191=True)
+    return execute_transaction_with_gas_estimation("validate ciphertext", soda_helper, contract_str,
+                                                   "validateCiphertextTest", func_args=[ct, ct, ct, ct, signature])
+
+
 def checkResults(soda_helper, expected_results, private_key):
     
     result = soda_helper.call_contract_view('PrecompilesArythmeticTestsContract.sol', "getAddResult")
@@ -603,6 +625,7 @@ def main(provider_url: str):
     
     # Run the tests
     runTestVectors(soda_helper)
+
 
 if __name__ == "__main__":
     url = parse_url_parameter()
