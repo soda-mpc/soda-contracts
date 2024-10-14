@@ -15,7 +15,7 @@ fi
 # Run the scripts
 python3 -m onboardUser.scripts.python.gen_account $RPC_NODE_URL
 source .env
-python3 -m onboardUser.scripts.python.transfer_native_coins $MASTER_KEY $RPC_NODE_URL
+python3 -m onboardUser.scripts.python.transfer_native_coins $MASTER_KEY $RPC_NODE_URL --amount_to_transfer 3000000
 python3 -m onboardUser.scripts.python.onboard_user $RPC_NODE_URL
 source .env
 
