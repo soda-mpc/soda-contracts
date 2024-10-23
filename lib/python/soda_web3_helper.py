@@ -10,7 +10,7 @@ from solcx import compile_standard, install_solc, get_installed_solc_versions
 import argparse
 from time import sleep
 sys.path.append('soda-sdk')
-from python.crypto import block_size, decrypt, generate_rsa_keypair, sign, decrypt_rsa
+from python.crypto import block_size, decrypt, generate_rsa_keypair, sign, recover_user_key
 
 LOCAL_PROVIDER_PORT = os.environ.get('LOCAL_PROVIDER_PORT', '7000')
 
@@ -27,13 +27,16 @@ def parse_url_parameter():
     parser = argparse.ArgumentParser(description='Get URL')
     parser.add_argument('provider_url', type=str, help='The provider url')
     args = parser.parse_args()
+    print(f'Provider URL: {args.provider_url}')
+
+    if not args.provider_url:
+        raise Exception("No URL provided")
     if args.provider_url == "Local":
         return LOCAL_PROVIDER_URL
     elif args.provider_url == "Remote":
         return REMOTE_HTTP_PROVIDER_URL
     else:
-        print("Invalid provider url")
-        return None
+        return args.provider_url
 
 
 def decrypt_bytes(encrypted_value, user_key):
@@ -92,6 +95,23 @@ def extract_event_value(contract, receipt, filter_func, event_name, target_attri
     return value_encrypted
 
 
+def getUserKeyShares(account, contract, receipt):
+    user_key_events = contract.events.UserKey().process_receipt(receipt)
+
+    key_0_share = None
+    key_1_share = None
+    # Filter events for the specific address
+    for event in user_key_events:
+        if event['args']['_owner'].lower() == account.address.lower():
+            key_0_share = event['args']['_keyShare0']
+            key_1_share = event['args']['_keyShare1']
+
+    if key_0_share is None or key_1_share is None:
+        raise Exception("Failed to find the key shares of the account address in the transaction receipt.")
+
+    return key_0_share, key_1_share
+
+
 def get_user_aes_key(soda_helper, account):
     """
         This function is used to onboard a user by generating an AES key for them.
@@ -111,18 +131,17 @@ def get_user_aes_key(soda_helper, account):
     # Generate new RSA key pair
     private_key, public_key = generate_rsa_keypair()
     # Sign the public key
-    signed_ek = sign(public_key, bytes.fromhex(account._private_key.hex()[2:]))
+    signature = sign(public_key, bytes.fromhex(account._private_key.hex()[2:]))
 
-    # Call the getUserKey function to get the encrypted AES key
-    receipt = soda_helper.call_contract_transaction("onboard_user", "getUserKey", func_args=[public_key, signed_ek],
-                                                    account=account)
+    # Call the getUserKey function to get the encrypted AES shares
+    receipt = soda_helper.call_contract_transaction("onboard_user", "getUserKey", func_args=[public_key, signature], account=account)
     if receipt is None:
-        print("Failed to call the transaction function")
-        return
-    encryptedKey = contract.functions.getSavedUserKey().call({'from': account.address})
+        raise Exception("Failed to call the transaction function")
 
-    # Decrypt the aes key using the RSA private key
-    decrypted_aes_key = decrypt_rsa(private_key, encryptedKey)
+    encryptedKey0, encryptedKey1 = getUserKeyShares(account, contract, receipt)
+
+    # Recover the aes key using the RSA private key and the given shares
+    decrypted_aes_key = recover_user_key(private_key, encryptedKey0, encryptedKey1)
 
     return decrypted_aes_key
 
@@ -159,6 +178,16 @@ class SodaWeb3Helper:
             return False
         
         self.contracts[contract_id] = self.web3.eth.contract(abi=contract_abi, bytecode=contract_bytecode)
+        return True
+
+    def update_contract_address(self, contract_id, contract_address):
+        if contract_id not in self.contracts:
+            raise Exception(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
+
+        self.contracts[contract_id] = self.web3.eth.contract(
+            address=contract_address,
+            abi=self.contracts[contract_id].abi,
+            bytecode=self.contracts[contract_id].bytecode)
         return True
 
     def get_contract(self, contract_id):

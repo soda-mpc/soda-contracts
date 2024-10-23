@@ -1,8 +1,9 @@
+import logging
 import os
 import sys
 from time import sleep 
 sys.path.append('soda-sdk')
-from python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, decrypt_rsa, encrypt_rsa, sign, decrypt, prepare_IT
+from python.crypto import recover_user_key, generate_rsa_keypair, sign, decrypt, prepare_IT
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 from web3.exceptions import TransactionNotFound
 from eth_account import Account
@@ -150,8 +151,8 @@ def checkCt(ct, decrypted_aes_key, expected_result):
 
 def test_getUserKey(soda_helper, contract, a, public_key):
     signing_key = os.environ.get('SIGNING_KEY')
-    signedEK = sign(public_key, bytes.fromhex(signing_key[2:]))
-    execute_transaction_with_gas_estimation("get user key", soda_helper, contract, "userKeyTest", func_args=[public_key, signedEK])
+    signature = sign(public_key, bytes.fromhex(signing_key[2:]))
+    execute_transaction_with_gas_estimation("get user key", soda_helper, contract, "userKeyTest", func_args=[public_key, signature])
 
     return execute_transaction_with_gas_estimation("offboard to user", soda_helper, contract, "offboardToUserTest", func_args=[a, soda_helper.get_account().address])
 
@@ -302,8 +303,8 @@ def checkResults(soda_helper, expected_results, private_key):
     check_expected_result("boolean_mux", expected_results["boolean_mux"], muxRes)
     check_expected_result("boolean_onboard_offboard", expected_results["boolean_onboard_offboard"], onboardRes)
 
-    encryptedUserKey = soda_helper.call_contract_view("PrecompilesOffboardToUserKeyTestContract.sol", "getUserKey")
-    decrypted_aes_key = decrypt_rsa(private_key, encryptedUserKey)
+    (encryptedKey0, encryptedKey1) = soda_helper.call_contract_view("PrecompilesOffboardToUserKeyTestContract.sol", "getUserKeyShares")
+    decrypted_aes_key = recover_user_key(private_key, encryptedKey0, encryptedKey1)
 
     ct8, ct16, ct32, ct64 = soda_helper.call_contract_view("PrecompilesOffboardToUserKeyTestContract.sol", "getCTs")
     checkCt(ct8, decrypted_aes_key, expected_results["offboard_user"])
@@ -521,6 +522,9 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b):
                 continue
             try:
                 r = soda_helper.web3.eth.get_transaction_receipt(h.hex())
+                if r is not None:
+                    if r.status == 0:
+                        raise Exception(f'Transaction {name} reverted.')
                 tx_receipts.add(h)
             except TransactionNotFound as e:
                 pass
@@ -561,4 +565,8 @@ def main(provider_url: str):
 if __name__ == "__main__":
     url = parse_url_parameter()
     if (url is not None):
-        main(url)
+        try:
+            main(url)
+        except Exception as e:
+            logging.error("An error occurred: %s", e)
+            raise e

@@ -1,4 +1,3 @@
-import fs from 'fs';
 import { block_size, decrypt, prepareIT, hexBase } from '../../../soda-sdk/js/crypto.js';
 import {
     SodaWeb3Helper,

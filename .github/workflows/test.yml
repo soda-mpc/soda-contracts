@@ -46,6 +46,8 @@ jobs:
           chmod +x onboardUser/scripts/js/onboard_user.mjs 
           node onboardUser/scripts/js/onboard_user.mjs Remote
         timeout-minutes: 5
+        env:
+          DISABLE_GAS_ESTIMATION: "true"
     
       - name: Run js ERC20
         run: |
@@ -56,7 +58,7 @@ jobs:
       - name: Run js ERC20 with EIP 191 signatures
         run: |
           source .env
-          node examples/scripts/js/run_private_erc20.mjs Remote --use_eip191_signature=True
+          node examples/scripts/js/run_private_erc20.mjs --use_eip191_signature=true Remote
         timeout-minutes: 5
 
       - name: Onboard user - python
