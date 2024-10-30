@@ -1,5 +1,5 @@
 import fs from 'fs';
-import {reconstructUserKey, generateRSAKeyPair, sign} from '../../../soda-sdk/js/crypto.js';
+import {reconstructUserKey, generateRSAKeyPair, sign} from '../../../soda-sdk/js/crypto.mjs';
 import {LOCAL_PROVIDER_URL, REMOTE_HTTP_PROVIDER_URL, SodaWeb3Helper} from '../../../lib/js/sodaWeb3Helper.mjs';
 import yargs from "yargs";
 import {hideBin} from "yargs/helpers";

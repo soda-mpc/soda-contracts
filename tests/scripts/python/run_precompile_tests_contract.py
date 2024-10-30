@@ -3,7 +3,7 @@ import os
 import sys
 from time import sleep 
 sys.path.append('soda-sdk')
-from python.crypto import recover_user_key, generate_rsa_keypair, sign, decrypt, prepare_IT
+from python.soda_python_sdk.crypto import recover_user_key, generate_rsa_keypair, sign, decrypt, prepare_IT
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 from web3.exceptions import TransactionNotFound
 from eth_account import Account

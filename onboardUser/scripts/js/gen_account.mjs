@@ -1,6 +1,6 @@
 import fs from 'fs';
 import {privateToAddress} from 'ethereumjs-util';
-import {generateECDSAPrivateKey} from '../../../soda-sdk/js/crypto.js';
+import {generateECDSAPrivateKey} from '../../../soda-sdk/js/crypto.mjs';
 
 // Generate ECDSA private key
 const privateKey = generateECDSAPrivateKey().toString('hex');

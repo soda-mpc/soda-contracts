@@ -2,7 +2,7 @@ import os
 from eth_account import Account
 import sys
 sys.path.append('soda-sdk')
-from python.crypto import prepare_IT
+from python.soda_python_sdk.crypto import prepare_IT
 from lib.python.soda_web3_helper import (SodaWeb3Helper, decrypt_value_int, get_function_signature, LOCAL_PROVIDER_URL,
                                          REMOTE_HTTP_PROVIDER_URL)
 from web3.exceptions import TransactionNotFound

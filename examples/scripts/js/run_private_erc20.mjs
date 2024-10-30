@@ -1,4 +1,4 @@
-import { block_size, decrypt, prepareIT, hexBase } from '../../../soda-sdk/js/crypto.js';
+import { BLOCK_SIZE, decrypt, prepareIT, HEX_BASE } from '../../../soda-sdk/js/crypto.mjs';
 import {
     SodaWeb3Helper,
     LOCAL_PROVIDER_URL,
@@ -25,26 +25,30 @@ function getFunctionSignature(func) {
     return Buffer.from(encodedABI.substr(2, 8), 'hex');
 }
 
+function uint8ArrayToBigInt(uint8Array) {
+    let value = BigInt(0);
+    for (let i = 0; i < uint8Array.length; i++) {
+        value = (value << 8n) | BigInt(uint8Array[i]);
+    }
+    return value;
+}
+
 function decryptValue(myCTBalance, userKey) {
 
     // Convert CT to bytes
-    let ctString = myCTBalance.toString(hexBase);
+    let ctString = myCTBalance.toString(HEX_BASE);
     let ctArray = Buffer.from(ctString, 'hex');
     while (ctArray.length < 32) { // When the first bits are 0, bigint bit size is less than 32 and need to re-add the bits
         ctString = "0" + ctString;
         ctArray = Buffer.from(ctString, 'hex');
     }
     // Split CT into two 128-bit arrays r and cipher
-    const cipher = ctArray.subarray(0, block_size);
-    const r = ctArray.subarray(block_size);
+    const cipher = ctArray.subarray(0, BLOCK_SIZE);
+    const r = ctArray.subarray(BLOCK_SIZE);
 
     // Decrypt the cipher
     const decryptedMessage = decrypt(userKey, r, cipher);
-
-    // console.log the decrypted cipher
-    const decryptedBalance = parseInt(decryptedMessage.toString('hex'), block_size);
-
-    return decryptedBalance;
+    return Number(uint8ArrayToBigInt(decryptedMessage));
 }
 
 async function getEncryptedBalance(sodaHelper, contract){
@@ -208,7 +212,15 @@ async function main() {
     func = contract.methods.transfer(alice_address.address, dummyCT, dummySignature, false); // Create dummy function to get the signature for prepare input text
     let hashFuncSig = getFunctionSignature(func);
     // After the function signature is obtained, prepare the input test for the function
-    let {ctInt, signature} = prepareIT(plaintext_integer, user_key, account.address, contract.options.address, hashFuncSig, Buffer.from(SIGNING_KEY.slice(2), 'hex'), useEIP191);
+    let {ctInt, signature} = prepareIT(
+      plaintext_integer,
+      user_key,
+      Buffer.from(account.address.toString().slice(2), 'hex'),
+      Buffer.from(contract.options.address.toString().slice(2), 'hex'),
+      hashFuncSig,
+      Buffer.from(SIGNING_KEY.slice(2), 'hex'),
+      useEIP191
+    );
     // Create the real function using the prepared IT
     func = contract.methods.transfer(alice_address.address, ctInt, signature, false);
     // Transfer 5 SOD to Alice
@@ -240,12 +252,20 @@ async function main() {
     // Transfer 5 SOD to Alice
     func = contract.methods.transferFrom(account.address, alice_address.address, dummyCT, dummySignature, false);
     hashFuncSig = getFunctionSignature(func);
-    ({ctInt, signature} = prepareIT(plaintext_integer, user_key, account.address, contract.options.address, hashFuncSig, Buffer.from(SIGNING_KEY.slice(2), 'hex'), useEIP191));
+    ({ctInt, signature} = prepareIT(
+      plaintext_integer,
+      user_key,
+      Buffer.from(account.address.toString().slice(2), 'hex'),
+      Buffer.from(contract.options.address.toString().slice(2), 'hex'),
+      hashFuncSig,
+      Buffer.from(SIGNING_KEY.slice(2), 'hex'),
+      useEIP191)
+    );
     // Create the real function using the prepared IT output
     func = contract.methods.transferFrom(account.address, alice_address.address, ctInt, signature, false);
     let hash = await execute_transaction(sodaHelper, func, contract)
-    receipt = await sodaHelper.waitForTransactionReceipt(hash)
-    
+    await sodaHelper.waitForTransactionReceipt(hash)
+
     console.log("************* Check my balance *************")
     await checkBalance(sodaHelper, contract, user_key, INITIAL_BALANCE - 6*plaintext_integer);
     

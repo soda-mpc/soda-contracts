@@ -10,7 +10,7 @@ from solcx import compile_standard, install_solc, get_installed_solc_versions
 import argparse
 from time import sleep
 sys.path.append('soda-sdk')
-from python.crypto import block_size, decrypt, generate_rsa_keypair, sign, recover_user_key
+from python.soda_python_sdk.crypto import BLOCK_SIZE as BLOCK_SIZE_LIB, decrypt, generate_rsa_keypair, sign, recover_user_key
 
 LOCAL_PROVIDER_PORT = os.environ.get('LOCAL_PROVIDER_PORT', '7000')
 
@@ -44,8 +44,8 @@ def decrypt_bytes(encrypted_value, user_key):
     byte_array = encrypted_value.to_bytes(BLOCK_SIZE, byteorder='big')
 
     # Split ct into two 128-bit arrays r and cipher
-    cipher = byte_array[:block_size]
-    r = byte_array[block_size:]
+    cipher = byte_array[:BLOCK_SIZE_LIB]
+    r = byte_array[BLOCK_SIZE_LIB:]
 
     # Decrypt the cipher
     decrypted_val_bytes = decrypt(user_key, r, cipher)
