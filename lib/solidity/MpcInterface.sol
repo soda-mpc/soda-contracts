@@ -39,6 +39,7 @@ interface ExtendedOperations {
     function ValidateCiphertext(bytes1 metaData, uint256 ciphertext, bytes calldata signature) external returns (uint256 result);
     function GetUserKey(bytes calldata signedEK) external returns (bytes memory encryptedKey);
     function DeleteUserKey(bytes calldata signature) external returns (bool);
+    function SHA256Fixed432BitInput(uint256 amount, uint256 seed1, uint256 seed2, uint256 padding1, uint256 padding2, bytes calldata addr) external returns (bytes memory result);
 }
 
 address constant MPC_PRECOMPILE = address(0x0000000000000000000000000000000000000064);

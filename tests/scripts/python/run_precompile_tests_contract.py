@@ -7,6 +7,7 @@ from python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair,
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 from web3.exceptions import TransactionNotFound
 from eth_account import Account
+import hashlib
 
 # Path to the Solidity files
 SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol',
@@ -22,7 +23,8 @@ SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol',
                   'PrecompilesShiftTestsContract.sol', 
                   'PrecompilesComparison1TestsContract.sol',
                   'PrecompilesOffboardToUserKeyTestContract.sol',
-                  'PrecompilesCheckedFuncsTestsContract.sol']
+                  'PrecompilesCheckedFuncsTestsContract.sol',
+                  'PrecompilesSHATestsContract.sol']
 NONCE = 0
 
 def setup(provider_url: str):
@@ -231,6 +233,9 @@ def test_validate_ciphertext_eip191(soda_helper, contract_str, a):
     return execute_transaction_with_gas_estimation("validate ciphertext", soda_helper, contract_str,
                                                    "validateCiphertextTest", func_args=[ct, ct, ct, ct, signature])
 
+def test_sha256(soda_helper, contract, a, b):
+    return execute_transaction_with_gas_estimation("sha256Fixed432BitInput", soda_helper, contract, "sha256Fixed432BitInputTest", func_args=[a, b, b, soda_helper.account.address, 0, 0])
+
 
 def checkResults(soda_helper, expected_results, private_key):
     
@@ -376,6 +381,9 @@ def checkResults(soda_helper, expected_results, private_key):
 
     result = soda_helper.call_contract_view('PrecompilesMiscellaneous1TestsContract.sol', "getValidateCiphertextResult")
     check_expected_result("validate_ciphertext", expected_results["validate_ciphertext"], result)
+
+    result = soda_helper.call_contract_view('PrecompilesSHATestsContract.sol', "getSHAOutput")
+    check_expected_result("SHA256Fixed43bitInput", expected_results["SHA256Fixed43bitInput"], result)
 
 # Main test function
 def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance):
@@ -587,6 +595,20 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
     print("Run random Bounded Bits test...")
     tx_hash = test_randomBoundedBits(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', numBits)
     tx_hashes[tx_hash] = "random_bounded"
+
+    # test SHA256Fixed43bitInput
+    print("Run SHA256 with fixed 432 bit input test...")
+    tx_hash = test_sha256(soda_helper, 'PrecompilesSHATestsContract.sol', a, b)
+    tx_hashes[tx_hash] = "SHA256Fixed43bitInput"
+    aBytes = a.to_bytes(8, byteorder='big')
+    bBytes = b.to_bytes(8, byteorder='big')
+    zero64 = bytes(8) # Represents 64 bits of zeros
+    zero16 = bytes(2) # Represents 16 bits of zeros
+    address_bytes = bytes.fromhex(soda_helper.account.address[2:])
+    data = aBytes + bBytes + bBytes + address_bytes + zero64 + zero16
+    hash_object = hashlib.sha256(data)
+    expected_result = hash_object.digest()
+    expected_results["SHA256Fixed43bitInput"] = expected_result
     
     tx_receipts = set()
     print(f"Wait for transaction receipts...")

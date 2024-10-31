@@ -130,7 +130,9 @@ library MpcCore {
         ExtendedOperations(address(MPC_PRECOMPILE)).DeleteUserKey(signature);
     }
 
-    
+    function SHA256Fixed432BitInput(gtUint64 amount, gtUint64 seed1, gtUint64 seed2, address addr, uint64 padding1, uint16 padding2) internal returns (bytes memory result){
+        return ExtendedOperations(address(MPC_PRECOMPILE)).SHA256Fixed432BitInput(gtUint64.unwrap(amount), gtUint64.unwrap(seed1), gtUint64.unwrap(seed2), uint256(padding1), uint256(padding2), abi.encodePacked(addr));
+    }
 
 // =========== 1 bit operations ==============
 
