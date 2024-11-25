@@ -4,7 +4,7 @@ from eth_account import Account
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 import sys
 sys.path.append('soda-sdk')
-from python.crypto import generate_rsa_keypair, sign, recover_user_key, prepare_delete_key_signature, prepare_IT
+from python.crypto import generate_rsa_keypair, sign, recover_user_key, prepare_IT
 
 SIGNATURE_SIZE = 65
 
@@ -69,35 +69,6 @@ def get_function_signature(function_abi):
 
     # Generate the function signature
     return f"{function_abi['name']}({input_types})"
-
-def methodNotFoundTest(signing_key, soda_helper, contract_str, account):
-    # Get user key
-    user_key1 = getUserKey(signing_key, soda_helper, contract_str)
-    print('User key:', user_key1)
-
-    contract = soda_helper.get_contract(contract_str)
-    
-    dummySignature = bytes(SIGNATURE_SIZE)
-    function = contract.functions.deleteUserKey(dummySignature)
-    func_sig = get_function_signature(function.abi) # Get the function signature
-    # Sign the message
-    signature = prepare_delete_key_signature(account, contract, func_sig, bytes.fromhex(signing_key[2:]))
-
-    # Call an non-existing function to check if it reverts
-    receipt = soda_helper.call_contract_transaction(contract_str, "deleteUserKey", func_args=[signature])
-
-    if receipt is None:
-        raise Exception("Failed to call the transaction function")
-    
-    if receipt.status == 0:
-        print(f'Test methodNotFound reverted as expected')
-    else:
-        raise ValueError(f'Test methodNotFound did not revert')
-    
-    user_key2 = getUserKey(signing_key, soda_helper, contract_str)
-    if user_key1 != user_key2:
-        raise ValueError(f'Test methodNotFound did not revert')
-    
 
 def errorVerifyingSignatureTest(signing_key, soda_helper, conrtact_str):
     # Generate new RSA key pair and signature on the public key
@@ -278,9 +249,6 @@ def main(provider_url: str):
     if len(receipts) != len(SOLIDITY_FILES):
         raise Exception("Failed to deploy the contracts")
     
-    # Check revert on 'method not found' error
-    methodNotFoundTest(signing_key, soda_helper, SOLIDITY_FILES[0], account)
-
     # Check revert on 'error verifying signature' error in getUserKey function
     errorVerifyingSignatureTest(signing_key, soda_helper, SOLIDITY_FILES[0])
 

@@ -38,7 +38,6 @@ interface ExtendedOperations {
     function TransferWithAllowance(bytes5 metaData, uint256 a, uint256 b, uint256 amount, uint256 allowance) external returns (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance);
     function ValidateCiphertext(bytes1 metaData, uint256 ciphertext, bytes calldata signature) external returns (uint256 result);
     function GetUserKey(bytes calldata signedEK) external returns (bytes memory encryptedKey);
-    function DeleteUserKey(bytes calldata signature) external returns (bool);
     function SHA256Fixed432BitInput(uint256 amount, uint256 seed1, uint256 seed2, uint256 padding1, uint256 padding2, bytes calldata addr) external returns (bytes memory result);
 }
 
