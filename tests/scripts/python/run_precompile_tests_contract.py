@@ -230,7 +230,7 @@ def test_validate_ciphertext_eip191(soda_helper, contract_str, a):
     # Prepare the input text for the function
     ct, signature = prepare_IT(a, user_aes_key, Account.from_key(sign_key), contract, func_sig,
                                bytes.fromhex(sign_key[2:]), eip191=True)
-    return execute_transaction_with_gas_estimation("validate ciphertext", soda_helper, contract_str,
+    return execute_transaction_with_gas_estimation("validate ciphertext eip191", soda_helper, contract_str,
                                                    "validateCiphertextTest", func_args=[ct, ct, ct, ct, signature])
 
 def test_sha256(soda_helper, contract, a, b):
@@ -381,6 +381,9 @@ def checkResults(soda_helper, expected_results, private_key):
 
     result = soda_helper.call_contract_view('PrecompilesMiscellaneous1TestsContract.sol', "getValidateCiphertextResult")
     check_expected_result("validate_ciphertext", expected_results["validate_ciphertext"], result)
+
+    result = soda_helper.call_contract_view('PrecompilesMiscellaneous1TestsContract.sol', "getValidateCiphertextResult")
+    check_expected_result("validate_ciphertext_eip191", expected_results["validate_ciphertext_eip191"], result)
 
     result = soda_helper.call_contract_view('PrecompilesSHATestsContract.sol', "getSHAOutput")
     check_expected_result("SHA256Fixed43bitInput", expected_results["SHA256Fixed43bitInput"], result)
@@ -585,6 +588,12 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
     tx_hash = test_validate_ciphertext(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', a)
     tx_hashes[tx_hash] = "validate_ciphertext"
     expected_results["validate_ciphertext"] = a
+
+    # Test Validate Ciphertext
+    print("Run validate ciphertext eip191 test...")
+    tx_hash = test_validate_ciphertext_eip191(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', a)
+    tx_hashes[tx_hash] = "validate_ciphertext_eip191"
+    expected_results["validate_ciphertext_eip191"] = a
 
     # test random
     print("Run random test...")
