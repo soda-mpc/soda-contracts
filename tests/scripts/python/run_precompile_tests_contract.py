@@ -1,10 +1,12 @@
+import argparse
+from datetime import datetime
 import logging
 import os
 import sys
 from time import sleep
 sys.path.append('soda-sdk')
 from python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, recover_user_key, sign, decrypt, prepare_IT
-from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
+from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL, REMOTE_HTTP_PROVIDER_URL
 from web3.exceptions import TransactionNotFound
 from eth_account import Account
 import hashlib
@@ -27,6 +29,9 @@ SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol',
                   'PrecompilesSHATestsContract.sol']
 NONCE = 0
 
+timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+OUTPUT_FILE = f'mpc_test_output.txt'
+
 def setup(provider_url: str):
     signing_key = os.environ.get('SIGNING_KEY')
 
@@ -36,12 +41,14 @@ def setup(provider_url: str):
     for file_name in SOLIDITY_FILES:
         success = soda_helper.setup_contract("tests/contracts/" + file_name, file_name)
         if not success:
+            print_error_to_file(f'Failed to set up the contract {file_name}')
             raise Exception("Failed to set up the contract")
 
     # Deploy the contract
     receipts = soda_helper.deploy_multi_contracts(SOLIDITY_FILES, constructor_args=[])
     
     if len(receipts) != len(SOLIDITY_FILES):
+        print_error_to_file(f'Failed to deploy the contracts')
         raise Exception("Failed to deploy the contracts")
 
     global NONCE
@@ -49,11 +56,18 @@ def setup(provider_url: str):
 
     return soda_helper
 
+def print_with_timestamp(message):
+    print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} - {message}')
+
+def print_error_to_file(message):
+    with open(OUTPUT_FILE, "a") as output_file:
+        print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} - {message}', file=output_file, flush=True)
+
 def execute_transaction_with_gas_estimation(name, soda_helper, contract, func_name, func_args=None):
     if func_args is None:
         func_args = []
     gas_estimate = soda_helper.estimate_gas(contract, func_name, func_args=func_args)
-    print('Estimated Gas:', gas_estimate)
+    print_with_timestamp(f'Estimated Gas: {gas_estimate}')
     global NONCE
     tx_hash = soda_helper.call_contract_transaction_async(contract, func_name, NONCE, func_args=func_args)
     NONCE += 1
@@ -69,8 +83,9 @@ def execute_transaction(name, soda_helper, contract, func_name, func_args=None):
 
 def check_expected_result(name, expected_result, result):
     if result == expected_result:
-        print(f'Test {name} succeeded: {result}')
+        print_with_timestamp(f'Test {name} succeeded: {result}')
     else:
+        print_error_to_file(f'Test {name} failed. Expected: {expected_result}, Actual: {result}')
         raise ValueError(f'Test {name} failed. Expected: {expected_result}, Actual: {result}')
 
 # Test functions
@@ -316,6 +331,7 @@ def checkResults(soda_helper, expected_results, private_key):
     
     new_a, new_b, res = soda_helper.call_contract_view('PrecompilesTransferTestsContract.sol', "getResults")
     if not res:
+        print_error_to_file(f'Test transfer failed.')
         raise Exception(f'Test transfer Failed.')
     
     check_expected_result("transfer", expected_results["transfer_a"], new_a)
@@ -323,6 +339,7 @@ def checkResults(soda_helper, expected_results, private_key):
     
     new_a, new_b, res = soda_helper.call_contract_view('PrecompilesTransferScalarTestsContract.sol', "getResults")
     if not res:
+        print_error_to_file(f'Test transfer scalar failed.')
         raise Exception(f'Test transfer scalar failed.')
     
     check_expected_result("transfer scalar", expected_results["transfer_a"], new_a)
@@ -330,6 +347,7 @@ def checkResults(soda_helper, expected_results, private_key):
 
     new_a, new_b, res, allowance = soda_helper.call_contract_view('PrecompilesTransferAllowanceTestsContract.sol', "getResults")
     if not res:
+        print_error_to_file(f'Test transfer with allowance failed.')
         raise Exception(f'Test transfer with allowance failed.')
     
     check_expected_result("transfer_allowance", expected_results["transfer_a"], new_a)
@@ -338,6 +356,7 @@ def checkResults(soda_helper, expected_results, private_key):
 
     new_a, new_b, res, allowance = soda_helper.call_contract_view('PrecompilesTransferAllowanceTestsContract.sol', "getResults")
     if not res:
+        print_error_to_file(f'Test transfer with allowance scalar failed.')
         raise Exception(f'Test transfer with allowance scalar failed.')
     
     check_expected_result("transfer_allowance_scalar", expected_results["transfer_a"], new_a)
@@ -366,17 +385,19 @@ def checkResults(soda_helper, expected_results, private_key):
     global last_random_result  # Use the global keyword to use and modify the global variable
     result = soda_helper.call_contract_view("PrecompilesMiscellaneous1TestsContract.sol", "getRandom")
     if result != last_random_result:
-        print(f'Test Random succeeded: {result}')
+        print_with_timestamp(f'Test Random succeeded: {result}')
         last_random_result = result
     else:
+        print_error_to_file(f'Test Random failed. {result}')
         raise Exception(f'Test Random failed. {result}')
 
     # global last_random_bounded_result
     # result = soda_helper.call_contract_view("PrecompilesMiscellaneous1TestsContract.sol", "getRandomBounded")
     # if result != last_random_bounded_result:
-    #     print(f'Test RandomBoundedBits succeeded: {result}')
+    #     print_with_timestamp(f'Test RandomBoundedBits succeeded: {result}')
     #     last_random_bounded_result = result
     # else:
+    #     print_error_to_file(f'Test RandomBoundedBits failed. {result}')
     #     raise Exception(f'Test RandomBoundedBits failed. {result}')
 
     result = soda_helper.call_contract_view('PrecompilesMiscellaneous1TestsContract.sol', "getValidateCiphertextResult")
@@ -394,90 +415,90 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
     tx_hashes = {}
 
     # Test Addition
-    print("Run addition test...")
+    print_with_timestamp("Run addition test...")
     tx_hash = test_addition(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "addition"
     expected_results["addition"] = a+b
 
     # Test Checked Addition
-    print("Run checked addition test...")
+    print_with_timestamp("Run checked addition test...")
     tx_hash = test_checked_addition(soda_helper, 'PrecompilesCheckedFuncsTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "checked_addition"
     expected_results["checked_addition"] = a+b
     
     # Test Subtraction
-    print("Run subtraction test...")
+    print_with_timestamp("Run subtraction test...")
     tx_hash = test_subtraction(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "subtract"
     expected_results["subtract"] = a-b
 
     # Test Checked Subtraction
-    print("Run checked subtraction test...")
+    print_with_timestamp("Run checked subtraction test...")
     tx_hash = test_checked_subtraction(soda_helper, 'PrecompilesCheckedFuncsTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "checked_subtract"
     expected_results["checked_subtract"] = a-b
 
     # Test Multiplication
-    print("Run multiplication test...")
+    print_with_timestamp("Run multiplication test...")
     tx_hash = test_multiplication(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "multiplication"
     expected_results["multiplication"] = a*b
 
     # Test checked Multiplication
-    print("Run checked multiplication test...")
+    print_with_timestamp("Run checked multiplication test...")
     tx_hash = test_checked_multiplication(soda_helper, 'PrecompilesCheckedFuncsTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "checked_multiplication"
 
     # Test Division
-    print("Run division test...")
+    print_with_timestamp("Run division test...")
     tx_hash = test_division(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "division"
     expected_results["division"] = a/b
 
     # Test Remainder
-    print("Run remainder test...")
+    print_with_timestamp("Run remainder test...")
     tx_hash = test_remainder(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "reminder"
     expected_results["reminder"] = a%b
 
     # Test Mux
-    print("Run mux test...")
+    print_with_timestamp("Run mux test...")
     tx_hash = test_mux(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', bit, a, b)
     tx_hashes[tx_hash] = "mux"
     expected_results["mux"] = a if bit == 0 else b
 
     # Test Offboard_Onboard
-    print("Run offboard_Onboard test...")
+    print_with_timestamp("Run offboard_Onboard test...")
     tx_hash = test_offboardOnboard(soda_helper, 'PrecompilesOffboardToUserKeyTestContract.sol', a)
     tx_hashes[tx_hash] = "onboard_offboard"
     expected_results["onboard_offboard"] = a
 
     # test Not
-    print("Run not test...")
+    print_with_timestamp("Run not test...")
     tx_hash = test_not(soda_helper, 'PrecompilesMiscellaneousTestsContract.sol', bit)
     tx_hashes[tx_hash] = "not"
     expected_results["not"] = not bit
 
     # Test Bitwise AND
-    print("Run and test...")
+    print_with_timestamp("Run and test...")
     tx_hash = test_bitwise_and(soda_helper, 'PrecompilesBitwiseTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "and"
     expected_results["and"] = a & b
 
     # Test Bitwise OR
-    print("Run or test...")
+    print_with_timestamp("Run or test...")
     tx_hash = test_bitwise_or(soda_helper, 'PrecompilesBitwiseTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "or"
     expected_results["or"] = a | b
 
     # Test Bitwise XOR
-    print("Run xor test...")
+    print_with_timestamp("Run xor test...")
     tx_hash = test_bitwise_xor(soda_helper, 'PrecompilesBitwiseTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "xor"
     expected_results["xor"] = a ^ b
 
     # Test Bitwise Shift Left
-    print("Run shift left test...")
+    print_with_timestamp("Run shift left test...")
     tx_hash = test_bitwise_shift_left(soda_helper, 'PrecompilesShiftTestsContract.sol', a, shift) 
     tx_hashes[tx_hash] = "shl"
     # Calculate the result in 8, 16, 32, and 64 bit
@@ -487,84 +508,84 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
     expected_results["shift_left64"] = (a << shift) & 0xFFFFFFFFFFFFFFFF
 
     # Test Bitwise Shift Right
-    print("Run shift right test...")
+    print_with_timestamp("Run shift right test...")
     tx_hash = test_bitwise_shift_right(soda_helper, 'PrecompilesShiftTestsContract.sol', a, shift)
     tx_hashes[tx_hash] = "shr"
     expected_results["shift_right"] = a >> shift
 
     # Test Min
-    print("Run min test...")
+    print_with_timestamp("Run min test...")
     tx_hash = test_min(soda_helper, 'PrecompilesMinMaxTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "min"
     expected_results["min"] = min(a, b)
 
     # Test Max
-    print("Run max test...")
+    print_with_timestamp("Run max test...")
     tx_hash = test_max(soda_helper, 'PrecompilesMinMaxTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "max"
     expected_results["max"] = max(a, b)
 
     # Test Equality
-    print("Run equality test...")
+    print_with_timestamp("Run equality test...")
     tx_hash = test_eq(soda_helper, 'PrecompilesComparison2TestsContract.sol', a, b)
     tx_hashes[tx_hash] = "eq"
     expected_results["eq"] = (a == b)
 
     # Test Not Equal
-    print("Run not equal test...")
+    print_with_timestamp("Run not equal test...")
     tx_hash = test_ne(soda_helper, 'PrecompilesComparison2TestsContract.sol', a, b)
     tx_hashes[tx_hash] = "ne"
     expected_results["ne"] = (a != b)
 
     # Test Greater Than or Equal
-    print("Run greater than or equal test...")
+    print_with_timestamp("Run greater than or equal test...")
     tx_hash = test_ge(soda_helper, 'PrecompilesComparison2TestsContract.sol', a, b)
     tx_hashes[tx_hash] = "ge"
     expected_results["ge"] = (a >= b)
 
     # Test Greater Than
-    print("Run greater than test...")
+    print_with_timestamp("Run greater than test...")
     tx_hash = test_gt(soda_helper, 'PrecompilesComparison1TestsContract.sol', a, b)
     tx_hashes[tx_hash] = "gt"
     expected_results["gt"] = (a > b)
 
     # Test Less Than or Equal
-    print("Run less than or equal test...")
+    print_with_timestamp("Run less than or equal test...")
     tx_hash = test_le(soda_helper, 'PrecompilesComparison1TestsContract.sol', a, b)
     tx_hashes[tx_hash] = "le"
     expected_results["le"] = (a <= b)
 
     # Test Less Than
-    print("Run less than test...")
+    print_with_timestamp("Run less than test...")
     tx_hash = test_lt(soda_helper, 'PrecompilesComparison1TestsContract.sol', a, b)
     tx_hashes[tx_hash] = "lt"
     expected_results["lt"] = (a < b)
 
     # Test Transfer
-    print("Run transfer test...")
+    print_with_timestamp("Run transfer test...")
     tx_hash = test_transfer(soda_helper, 'PrecompilesTransferTestsContract.sol', a, b, b)
     tx_hashes[tx_hash] = "transfer"
     expected_results["transfer_a"] = a - b
     expected_results["transfer_b"] = b + b
     
     # Test Transfer scalar
-    print("Run transfer scalar test...")
+    print_with_timestamp("Run transfer scalar test...")
     tx_hash = test_transfer(soda_helper, 'PrecompilesTransferScalarTestsContract.sol', a, b, b)
     tx_hashes[tx_hash] = "transfer_scalar"
 
     # Test Transfer with allowance
-    print("Run transfer with allowance test...")
+    print_with_timestamp("Run transfer with allowance test...")
     tx_hash = test_transfer_allowance(soda_helper, 'PrecompilesTransferAllowanceTestsContract.sol', a, b, b, allowance)
     tx_hashes[tx_hash] = "transfer_allowance"
     expected_results["transfer_allowance"] = allowance - b
 
     # Test Transfer with allowance scalar
-    print("Run transfer with allowance scalar test...")
+    print_with_timestamp("Run transfer with allowance scalar test...")
     tx_hash = test_transfer_allowance(soda_helper, 'PrecompilesTransferAllowanceScalarTestsContract.sol', a, b, b, allowance)
     tx_hashes[tx_hash] = "transfer_allowance_scalar"
 
     # Test boolean functions
-    print("Run Boolean functions test...")
+    print_with_timestamp("Run Boolean functions test...")
     tx_hash = test_boolean(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', bool_a, bool_b, bit)
     tx_hashes[tx_hash] = "boolean"
     expected_results["boolean_and"] = bool_a and bool_b
@@ -577,36 +598,36 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
     expected_results["boolean_onboard_offboard"] = bool_a
 
     # Test getUserKey
-    print("Run get user key test...")
+    print_with_timestamp("Run get user key test...")
     private_key, public_key = generate_rsa_keypair()
     tx_hash = test_getUserKey(soda_helper, 'PrecompilesOffboardToUserKeyTestContract.sol', a, public_key)
     tx_hashes[tx_hash] = "offboard_user"
     expected_results["offboard_user"] = a
 
     # Test Validate Ciphertext
-    print("Run validate ciphertext test...")
+    print_with_timestamp("Run validate ciphertext test...")
     tx_hash = test_validate_ciphertext(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', a)
     tx_hashes[tx_hash] = "validate_ciphertext"
     expected_results["validate_ciphertext"] = a
 
     # Test Validate Ciphertext
-    print("Run validate ciphertext eip191 test...")
+    print_with_timestamp("Run validate ciphertext eip191 test...")
     tx_hash = test_validate_ciphertext_eip191(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', a)
     tx_hashes[tx_hash] = "validate_ciphertext_eip191"
     expected_results["validate_ciphertext_eip191"] = a
 
     # test random
-    print("Run random test...")
+    print_with_timestamp("Run random test...")
     tx_hash = test_random(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol')
     tx_hashes[tx_hash] = "random"
 
     # test random bounded bits
-    print("Run random Bounded Bits test...")
+    print_with_timestamp("Run random Bounded Bits test...")
     tx_hash = test_randomBoundedBits(soda_helper, 'PrecompilesMiscellaneous1TestsContract.sol', numBits)
     tx_hashes[tx_hash] = "random_bounded"
 
     # test SHA256Fixed43bitInput
-    print("Run SHA256 with fixed 432 bit input test...")
+    print_with_timestamp("Run SHA256 with fixed 432 bit input test...")
     tx_hash = test_sha256(soda_helper, 'PrecompilesSHATestsContract.sol', a, b)
     tx_hashes[tx_hash] = "SHA256Fixed43bitInput"
     aBytes = a.to_bytes(8, byteorder='big')
@@ -620,7 +641,7 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
     expected_results["SHA256Fixed43bitInput"] = expected_result
     
     tx_receipts = set()
-    print(f"Wait for transaction receipts...")
+    print_with_timestamp(f"Wait for transaction receipts...")
     while len(tx_receipts) < len(tx_hashes):
         for h, name in tx_hashes.items():
             if h in tx_receipts:
@@ -629,6 +650,7 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
                 r = soda_helper.web3.eth.get_transaction_receipt(h.hex())
                 if r is not None:
                     if r.status == 0:
+                        print_error_to_file(f'Transaction {name} reverted.')
                         raise Exception(f'Transaction {name} reverted.')
                 tx_receipts.add(h)
             except TransactionNotFound as e:
@@ -639,25 +661,45 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
 
 def runTestVectors(soda_helper):
 
-    print(f'\nTest Vector 0\n')
+    print_with_timestamp(f'\nTest Vector 0\n')
 
     #  test vector 0
     run_tests(soda_helper, 10, 5, 2, False, 7, True, False, 7)
 
-    print(f'\nTest Vector 1\n')
+    print_with_timestamp(f'\nTest Vector 1\n')
 
     #  test vector 1
     run_tests(soda_helper, 100, 2, 10, True, 8, False, False, 80)
 
 
 def main(provider_url: str):
-    print("Running tests...")
+
+    print_with_timestamp("Running tests...")
     soda_helper = setup(provider_url)
     
     # Run the tests
     runTestVectors(soda_helper)
 
+def parse_url_parameter():
+    parser = argparse.ArgumentParser(description='Get URL')
+    parser.add_argument('provider_url', type=str, help='The provider url')
+    parser.add_argument("--output_file", help="The output file to write the results to", default="mpc_test_output.txt")
 
+    args = parser.parse_args()
+    print(f'Provider URL: {args.provider_url}')
+
+    global OUTPUT_FILE
+    OUTPUT_FILE = f'logs/{args.output_file}'
+
+    if not args.provider_url:
+        raise Exception("No URL provided")
+    if args.provider_url == "Local":
+        return LOCAL_PROVIDER_URL
+    elif args.provider_url == "Remote":
+        return REMOTE_HTTP_PROVIDER_URL
+    else:
+        return args.provider_url
+    
 if __name__ == "__main__":
     url = parse_url_parameter()
     if (url is not None):
