@@ -144,6 +144,15 @@ contract PrecompilesMiscellaneous1TestsContract {
         }
         // Check that not all the generated random values are the same
         checkNotAllEqual(randoms, size);
+
+        bool randRes = MpcCore.decrypt(MpcCore.rand());
+        uint numEqual = 0;
+        for (uint i = 0; i < MAX_BOOL_SIZE; i++) {
+            if (randRes == MpcCore.decrypt(MpcCore.rand())) {
+                numEqual++;
+            }
+        }
+        require(numEqual < MAX_BOOL_SIZE, "boolean random failed, all values are the same");
         
         return random; 
     }
