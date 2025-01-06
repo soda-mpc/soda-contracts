@@ -16,6 +16,15 @@ TOKEN=$SLACK_TOKEN
 CHANNEL=$ALERTS_CHANNEL_ID
 ENV_NAME=$ENV_NAME
 
+# Set the CHECK_RESULTS variable to True if it is not set
+if [ -z "$CHECK_RESULTS" ]; then
+  echo "CHECK_RESULTS is not set. Setting it to True."
+  CHECK_RESULTS="True"
+else
+  echo "CHECK_RESULTS is set. Setting it to $CHECK_RESULTS."
+  CHECK_RESULTS=$CHECK_RESULTS
+fi
+
 
 # Send the message
 send_slack_notification() {
@@ -47,7 +56,7 @@ success_counter=0
 failure_counter=0
 # Run the tests in a loop
 while true; do
-  python3 -m tests.scripts.python.run_precompile_tests_contract $RPC_NODE_URL --output_file $output_file
+  python3 -m tests.scripts.python.run_precompile_tests_contract $RPC_NODE_URL --output_file $output_file --check_results $CHECK_RESULTS
   if [ $? -eq 0 ]; then
     success_counter=$((success_counter+1))
     echo "Success: $success_counter"

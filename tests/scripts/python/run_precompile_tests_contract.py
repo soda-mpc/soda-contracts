@@ -410,7 +410,7 @@ def checkResults(soda_helper, expected_results, private_key):
     check_expected_result("SHA256Fixed43bitInput", expected_results["SHA256Fixed43bitInput"], result)
 
 # Main test function
-def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance):
+def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance, check_results):
     expected_results = {}
     tx_hashes = {}
 
@@ -640,6 +640,9 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
     expected_result = hash_object.digest()
     expected_results["SHA256Fixed43bitInput"] = expected_result
     
+    if not check_results:
+        return
+    
     tx_receipts = set()
     print_with_timestamp(f"Wait for transaction receipts...")
     while len(tx_receipts) < len(tx_hashes):
@@ -659,34 +662,41 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance)
 
     checkResults(soda_helper, expected_results, private_key)
 
-def runTestVectors(soda_helper):
+def runTestVectors(soda_helper, check_results):
 
     print_with_timestamp(f'\nTest Vector 0\n')
 
     #  test vector 0
-    run_tests(soda_helper, 10, 5, 2, False, 7, True, False, 7)
+    run_tests(soda_helper, 10, 5, 2, False, 7, True, False, 7, check_results)
 
     print_with_timestamp(f'\nTest Vector 1\n')
 
     #  test vector 1
-    run_tests(soda_helper, 100, 2, 10, True, 8, False, False, 80)
+    run_tests(soda_helper, 100, 2, 10, True, 8, False, False, 80, check_results)
 
 
-def main(provider_url: str):
+def main(provider_url: str, check_results: bool):
 
     print_with_timestamp("Running tests...")
     soda_helper = setup(provider_url)
-    
+
     # Run the tests
-    runTestVectors(soda_helper)
+    runTestVectors(soda_helper, check_results)
 
 def parse_url_parameter():
     parser = argparse.ArgumentParser(description='Get URL')
     parser.add_argument('provider_url', type=str, help='The provider url')
     parser.add_argument("--output_file", help="The output file to write the results to", default="mpc_test_output.txt")
+    parser.add_argument("--check_results", help="Indicates whether to check the results", default="True")
 
     args = parser.parse_args()
     print(f'Provider URL: {args.provider_url}')
+    if args.check_results == "False":  
+        check_results = False
+    else:
+        check_results = True
+    print(f'Check results: {check_results}')
+
 
     global OUTPUT_FILE
     OUTPUT_FILE = f'logs/{args.output_file}'
@@ -694,17 +704,17 @@ def parse_url_parameter():
     if not args.provider_url:
         raise Exception("No URL provided")
     if args.provider_url == "Local":
-        return LOCAL_PROVIDER_URL
+        return LOCAL_PROVIDER_URL, check_results
     elif args.provider_url == "Remote":
-        return REMOTE_HTTP_PROVIDER_URL
+        return REMOTE_HTTP_PROVIDER_URL, check_results
     else:
-        return args.provider_url
+        return args.provider_url, check_results
     
 if __name__ == "__main__":
-    url = parse_url_parameter()
+    url, check_results = parse_url_parameter()
     if (url is not None):
         try:
-            main(url)
+            main(url, check_results)
         except Exception as e:
             logging.error("An error occurred: %s", e)
             raise e
