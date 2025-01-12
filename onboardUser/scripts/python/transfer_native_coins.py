@@ -1,8 +1,11 @@
 import os
-import sys
 from eth_account import Account
 from lib.python.soda_web3_helper import SodaWeb3Helper, DEFAULT_GAS_PRICE, LOCAL_PROVIDER_URL, REMOTE_HTTP_PROVIDER_URL
 import argparse
+from web3.exceptions import TransactionNotFound, ContractLogicError
+
+MAX_GAS_PRICE = 1000
+INCREASE_PERCENT = 1.15
 
 def transfer_to_account(sender_account_key, receiver_account, provider_url, amount_to_transfer=3000):
     print(f"Sender account key: {sender_account_key}")
@@ -12,7 +15,32 @@ def transfer_to_account(sender_account_key, receiver_account, provider_url, amou
     print(f"Balance of the sender account: {sender_balance}")
     if sender_balance is None:
         print("Failed to get the balance of the account")
-    receipt = soda_helper.transfer_native_currency(receiver_account.address, amount_to_transfer)
+    
+    gas_price = DEFAULT_GAS_PRICE
+
+    # Attempt the transaction
+    while gas_price <= MAX_GAS_PRICE:
+        try:
+            soda_helper.transfer_native_currency(receiver_account.address, amount_to_transfer, gas_price=gas_price)
+            print(f"Transaction successful with gas price: {gas_price} wei")
+            break
+        except (TransactionNotFound, ContractLogicError) as e:
+            print(f"Transaction failed with gas price: {gas_price} wei. Error: {str(e)}")
+            gas_price = int(gas_price * INCREASE_PERCENT)  # Increase gas price by 15%
+        except Exception as e:
+            if len(e.args) > 0 and 'replacement transaction underpriced' in str(e.args[0]):
+                print(f"Transaction underpriced with gas price: {gas_price} wei. Retrying...")
+                gas_price = int(gas_price * INCREASE_PERCENT)  # Increase gas price by 15%
+            elif len(e.args) > 0 and 'is not in the chain after 120 seconds' in str(e.args[0]):
+                print(f"Transaction is not in the chain after 120 seconds. Retrying...")
+                gas_price = int(gas_price * INCREASE_PERCENT)  # Increase gas price by 15%
+            else:
+                print(f"Unexpected ValueError: {str(e)}")
+                break
+    else:
+        print("Transaction failed after reaching the maximum gas price.")
+
+
     # We check the balance of the accounts after the transfer is complete
     receiver_balance = soda_helper.get_native_currency_balance(receiver_account.address)
     assert receiver_balance == original_receiver_balance + soda_helper.convert_sod_to_wei(amount_to_transfer)
