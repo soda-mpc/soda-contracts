@@ -9,11 +9,14 @@ import argparse
 from time import sleep
 
 LOCAL_PROVIDER_URL = 'http://localhost:7001'
-REMOTE_HTTP_PROVIDER_URL = 'http://ec2-13-48-71-77.eu-north-1.compute.amazonaws.com:7000' 
+REMOTE_HTTP_PROVIDER_URL = 'http://ec2-184-73-147-220.compute-1.amazonaws.com:7000' 
 SOLC_VERSION = '0.8.19'
 DEFAULT_GAS_PRICE = 30
 DEFAULT_GAS_LIMIT = 10000000
 DEFAULT_CHAIN_ID = 50505050
+MAX_SLEEP_TIME = 600
+MAX_GAS_PRICE = 1000
+INCREASE_PERCENT = 1.15
 
 def parse_url_parameter():
     parser = argparse.ArgumentParser(description='Get URL')
@@ -94,6 +97,13 @@ class SodaWeb3Helper:
                 abi=self.contracts[contract_id].abi,
                 bytecode=self.contracts[contract_id].bytecode)
         return receipt
+    
+    def set_contract_address(self, contract_id, contract_address):
+        self.contracts[contract_id] = self.web3.eth.contract(
+                                      address=contract_address, 
+                                      abi=self.contracts[contract_id].abi,
+                                      bytecode=self.contracts[contract_id].bytecode)
+
 
     def deploy_multi_contracts(self, 
                         contracts_id, 
@@ -125,9 +135,20 @@ class SodaWeb3Helper:
         
         for contract_id in contracts_id:
             func_to_call = self.contracts[contract_id].constructor
-            construct_txn = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, constructor_args, account, nonce)
-            tx_hashes.append(self._sign_and_send_transaction(construct_txn, account, is_async=True))
-            nonce += 2
+            gas_price = DEFAULT_GAS_PRICE
+            # Attempt the transaction
+            while gas_price <= MAX_GAS_PRICE:
+                try:
+                    construct_txn = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, constructor_args, account, nonce)
+                    tx_hashes.append(self._sign_and_send_transaction(construct_txn, account, is_async=True))
+                    nonce += 2
+                    break
+                except Exception as e:
+                    print(f"Transaction failed with gas price: {gas_price} wei. Error: {str(e)}. Retrying...")
+                    gas_price = int(gas_price * INCREASE_PERCENT)  # Increase gas price by 15%
+            else:
+                print("Transaction failed after reaching the maximum gas price.")
+
             
         if any([h is None for h in tx_hashes]):
             raise Exception("Failed to deploy contracts.")
@@ -135,16 +156,23 @@ class SodaWeb3Helper:
         tx_receipts = [None]*len(tx_hashes)
         print(f"Wait for transaction receipts...")
                     
+        current_sleep_time = 0
         # Wait for transaction receipts for all contracts hashes
-        while not all(tx_receipts):
+        while not all(tx_receipts) and current_sleep_time < MAX_SLEEP_TIME:
             for i, tx_hash in enumerate(tx_hashes):
                 if tx_receipts[i] is not None:
                     continue
                 try:
                     tx_receipts[i] = self.web3.eth.get_transaction_receipt(tx_hash.hex())
+                    # print the number of receipts we got
+                    print(f"Got receipt {i+1} out of {len(tx_hashes)}")
                 except TransactionNotFound as e:
                     pass
+            current_sleep_time += 1
             sleep(1)
+
+        if current_sleep_time == MAX_SLEEP_TIME and not all(tx_receipts):
+            raise Exception("Failed to get transaction receipts.")
 
         for i, contract_id in enumerate(contracts_id):
             print(f"Contract deployed at address: {tx_receipts[i].contractAddress}")

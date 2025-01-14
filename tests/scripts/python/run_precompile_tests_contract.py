@@ -28,6 +28,7 @@ SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol',
                   'PrecompilesCheckedFuncsTestsContract.sol',
                   'PrecompilesSHATestsContract.sol']
 NONCE = 0
+MAX_SLEEP_TIME = 600
 
 timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 OUTPUT_FILE = f'mpc_test_output.txt'
@@ -44,8 +45,12 @@ def setup(provider_url: str):
             print_error_to_file(f'Failed to set up the contract {file_name}')
             raise Exception("Failed to set up the contract")
 
-    # Deploy the contract
-    receipts = soda_helper.deploy_multi_contracts(SOLIDITY_FILES, constructor_args=[])
+    try:
+        # Deploy the contract
+        receipts = soda_helper.deploy_multi_contracts(SOLIDITY_FILES, constructor_args=[])
+    except Exception as e:
+        print_error_to_file(f'Failed to deploy the contracts')
+        raise Exception("Failed to deploy the contracts")
     
     if len(receipts) != len(SOLIDITY_FILES):
         print_error_to_file(f'Failed to deploy the contracts')
@@ -643,9 +648,10 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance,
     if not check_results:
         return
     
+    current_sleep_time = 0
     tx_receipts = set()
     print_with_timestamp(f"Wait for transaction receipts...")
-    while len(tx_receipts) < len(tx_hashes):
+    while len(tx_receipts) < len(tx_hashes) and current_sleep_time < MAX_SLEEP_TIME:
         for h, name in tx_hashes.items():
             if h in tx_receipts:
                 continue
@@ -656,9 +662,15 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance,
                         print_error_to_file(f'Transaction {name} reverted.')
                         raise Exception(f'Transaction {name} reverted.')
                 tx_receipts.add(h)
+                print(f"Got {len(tx_receipts)} out of {len(tx_hashes)} receipts")
             except TransactionNotFound as e:
                 pass
+        current_sleep_time += 1
         sleep(1)
+
+    if len(tx_receipts) < len(tx_hashes):
+        print_error_to_file(f'Not all transactions were mined after {MAX_SLEEP_TIME} seconds.')
+        raise Exception(f'Not all transactions were mined after {MAX_SLEEP_TIME} seconds.')
 
     checkResults(soda_helper, expected_results, private_key)
 
