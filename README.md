@@ -1,5 +1,5 @@
-# Devnet
-Welcome to the Soda bubble devnet, where smart contract privacy is finally made possible on the EVM.
+# soda-contracts
+Welcome to the Soda bubble soda-contracts, where smart contract privacy is finally made possible on the EVM.
 Here you fill find all the tools and example that will help you get started.
 Our network is typically reachable on `node.sodalabs.net:7000`, if you are already familiar
 with smart contracts developments you could use any tool you are used to in order to interact with the Bubble devnet.
@@ -9,8 +9,8 @@ installing all the necessary dependencies for getting started.
 
 # Clone the Repository
 ```bash
-git clone git@github.com:soda-mpc/devnet.git
-cd devnet
+git clone git@github.com:soda-mpc/soda-contracts.git
+cd soda-contracts
 ```
 
 # Installation Instructions
@@ -67,7 +67,7 @@ This step generates a new private key and account.
 
 * Script: The script named gen_account, available in both Python and JavaScript, is provided to facilitate the generation of user accounts.
 
-* Execution: To execute the script, navigate to the main directory (Devnet) and run the appropriate command depending on the language choice:
+* Execution: To execute the script, navigate to the main directory (soda-contracts) and run the appropriate command depending on the language choice:
 
     ```bash
     python3 -m onboardUser.scripts.python.gen_account
@@ -103,7 +103,7 @@ Once the account is created and funded with native coins, it needs to be onboard
 
 * Script: The script named onboard_user, available in both Python and JavaScript, is provided to facilitate the the onboarding process.
 
-* Execution: Similar to step 1, navigate to the main directory (Devnet) and run the appropriate command depending on the language choice:
+* Execution: Similar to step 1, navigate to the main directory (soda-contracts) and run the appropriate command depending on the language choice:
 
     ```bash
     python3 -m onboardUser.scripts.python.onboard_user
@@ -149,7 +149,7 @@ It aims to ensure the confidentiality of token transactions through encryption t
 * Script: The script named run_private_erc20, available in both Python and JavaScript, is provided to run the example. 
 The run_private_erc20 script is designed to demonstrate the functionality of ERC20 tokens within the system. It includes functionalities such as transferring tokens, approving token transactions, and checking token balances.
 
-* Execution: Navigate to the main directory (Devnet) and run the appropriate command depending on the language choice:
+* Execution: Navigate to the main directory (soda-contracts) and run the appropriate command depending on the language choice:
 
     ```bash
     python3 -m examples.scripts.python.run_private_erc20
@@ -176,9 +176,9 @@ The tests script is designed to verify all supported functionalities of sodalabs
 * Execution Instructions:
 To execute the tests script, follow these steps:
 
-    * Navigate to Main Directory (Devnet):
+    * Navigate to Main Directory (soda-contracts):
 
-        Open your terminal or command prompt and navigate to the main directory of your project, which is named Devnet.
+        Open your terminal or command prompt and navigate to the main directory of your project, which is named soda-contracts.
 
     * Execute the Script:
 
