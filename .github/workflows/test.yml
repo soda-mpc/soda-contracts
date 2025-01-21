@@ -14,24 +14,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Setup SSH Key for soda-sdk
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SDK }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-          # Start the SSH agent and add the key
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_rsa
-
-      - name: Update soda-sdk submodule
-        run: |
-          git submodule update --init soda-sdk 
-          git submodule update --remote soda-sdk # get the latest commit
 
       - name: Install requirements
         run: |
+          pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
           npm install
           cd lib/js
@@ -48,7 +34,7 @@ jobs:
         timeout-minutes: 5
         env:
           DISABLE_GAS_ESTIMATION: "true"
-    
+
       - name: Run js ERC20
         run: |
           source .env

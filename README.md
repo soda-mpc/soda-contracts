@@ -11,8 +11,6 @@ installing all the necessary dependencies for getting started.
 ```bash
 git clone git@github.com:soda-mpc/devnet.git
 cd devnet
-git submodule update --init soda-sdk 
-git submodule update --remote soda-sdk
 ```
 
 # Installation Instructions

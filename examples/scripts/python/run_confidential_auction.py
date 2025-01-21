@@ -1,9 +1,6 @@
 import os
 from eth_account import Account
-import sys
-
-sys.path.append('soda-sdk')
-from python.soda_python_sdk.crypto import prepare_IT
+from soda_python_sdk import prepare_IT
 from lib.python.soda_web3_helper import (SodaWeb3Helper, parse_url_parameter, get_function_signature, decrypt_value_int,
                                          decrypt_value_bool, execute_transaction, extract_event_value, get_user_aes_key)
 

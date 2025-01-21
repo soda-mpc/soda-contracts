@@ -1,3 +1,0 @@
-[submodule "soda-sdk"]
-	path = soda-sdk
-	url = git@github.com:soda-mpc/soda-sdk.git

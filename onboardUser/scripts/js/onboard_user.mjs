@@ -1,5 +1,5 @@
 import fs from 'fs';
-import {reconstructUserKey, generateRSAKeyPair, sign} from '../../../soda-sdk/js/crypto.mjs';
+import {generateRSAKeyPair, sign, reconstructUserKey} from 'soda-sdk'
 import {LOCAL_PROVIDER_URL, REMOTE_HTTP_PROVIDER_URL, SodaWeb3Helper} from '../../../lib/js/sodaWeb3Helper.mjs';
 import yargs from "yargs";
 import {hideBin} from "yargs/helpers";
@@ -113,9 +113,7 @@ async function main() {
     const encryptedKey1 = response[1];
 
     // Decrypt the AES key using the RSA private key
-    const share0Buf = Buffer.from(encryptedKey0.substring(2), 'hex');
-    const share1Buf = Buffer.from(encryptedKey1.substring(2), 'hex');
-    const decryptedAESKey = reconstructUserKey(privateKey, share0Buf, share1Buf);
+    const decryptedAESKey = reconstructUserKey(privateKey, encryptedKey0.substring(2), encryptedKey1.substring(2));
 
     removeUserKeyFromFile('.env'); // Remove the old USER_KEY from the .env file
     // Write the new AES key to the .env file

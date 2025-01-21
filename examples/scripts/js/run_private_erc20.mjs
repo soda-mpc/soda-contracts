@@ -1,4 +1,4 @@
-import { BLOCK_SIZE, decrypt, prepareIT, HEX_BASE } from '../../../soda-sdk/js/crypto.mjs';
+import { BLOCK_SIZE, decrypt, prepareIT, HEX_BASE } from 'soda-sdk';
 import {
     SodaWeb3Helper,
     LOCAL_PROVIDER_URL,

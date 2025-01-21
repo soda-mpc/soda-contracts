@@ -1,7 +1,7 @@
 import os
 import sys
 sys.path.append('soda-sdk')
-from python.soda_python_sdk.crypto import generate_rsa_keypair, sign, recover_user_key
+from soda_python_sdk import generate_rsa_keypair, sign, recover_user_key
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter, getUserKeyShares
 import logging
 
@@ -67,6 +67,7 @@ def main(provider_url: str):
     # Write the data to a .env file
     with open('.env', 'a') as f:
         f.write(f"export USER_KEY='{decrypted_aes_key.hex()}'\n")
+    print("Successfully onboarded the user")
 
 
 if __name__ == "__main__":
