@@ -166,6 +166,8 @@ class SodaWeb3Helper:
                     tx_receipts[i] = self.web3.eth.get_transaction_receipt(tx_hash.hex())
                     # print the number of receipts we got
                     print(f"Got receipt {i+1} out of {len(tx_hashes)}")
+                    if tx_receipts[i].status == 0:
+                        print("Deploy contract failed, receipt = ", {tx_receipts[i]})
                 except TransactionNotFound as e:
                     pass
             current_sleep_time += 1

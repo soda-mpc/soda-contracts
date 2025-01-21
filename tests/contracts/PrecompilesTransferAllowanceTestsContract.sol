@@ -165,7 +165,7 @@ contract PrecompilesTransferAllowanceTestsContract {
 
     function computeAndCheckTransfer64(AllGTCastingValues memory allGTCastingValues, AllAmountValues memory allAmountValues, AllAllowanceValues memory allAllowanceValues, uint8 new_a, uint8 new_b, bool res, uint8 newAllowance) public {
 
-        // Check all options for casting to 64 while amount is 64 and allowance is 8
+        // Check all options for casting to 64 while amount is 64 and allowance is 64
         (gtUint64 newA_s, gtUint64 newB_s, gtBool res_s, gtUint64 newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a64_s, allGTCastingValues.b64_s, allAmountValues.amount64_s, allAllowanceValues.allowance64_s);
         require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 64 failed");
 
@@ -246,7 +246,7 @@ contract PrecompilesTransferAllowanceTestsContract {
         computeAndCheckTransfer16(allGTCastingValues, allAmountValues, allAllowanceValues, newA, newB, result, newAllowance);
 
         // Calculate the result with casting to 32
-        // computeAndCheckTransfer32(allGTCastingValues, allAmountValues, allAllowanceValues, newA, newB, result, newAllowance);
+        computeAndCheckTransfer32(allGTCastingValues, allAmountValues, allAllowanceValues, newA, newB, result, newAllowance);
 
         // Calculate the result with casting to 64
         computeAndCheckTransfer64(allGTCastingValues, allAmountValues, allAllowanceValues, newA, newB, result, newAllowance);

@@ -82,30 +82,31 @@ contract PrecompilesTransferAllowanceScalarTestsContract {
         (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a8_s, allGTCastingValues.b32_s, amount, allAllowanceValues.allowance16_s);
         require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
 
-        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a32_s, allGTCastingValues.b8_s, amount, allAllowanceValues.allowance16_s);
-        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
+        // TODO Add the following checks, maybe in another contract (these checks commented out because of high gas cost)
+        // (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a32_s, allGTCastingValues.b8_s, amount, allAllowanceValues.allowance16_s);
+        // require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
 
-        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a16_s, allGTCastingValues.b32_s, amount, allAllowanceValues.allowance16_s);
-        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
+        // (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a16_s, allGTCastingValues.b32_s, amount, allAllowanceValues.allowance16_s);
+        // require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
 
-        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a32_s, allGTCastingValues.b16_s, amount, allAllowanceValues.allowance16_s);
-        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
+        // (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a32_s, allGTCastingValues.b16_s, amount, allAllowanceValues.allowance16_s);
+        // require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
     
-        // Check all options for casting to 32 while amount is scalar and allowance is 32
-        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a32_s, allGTCastingValues.b32_s, amount, allAllowanceValues.allowance32_s);
-        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
+        // // Check all options for casting to 32 while amount is scalar and allowance is 32
+        // (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a32_s, allGTCastingValues.b32_s, amount, allAllowanceValues.allowance32_s);
+        // require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
 
-        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a8_s, allGTCastingValues.b32_s, amount, allAllowanceValues.allowance32_s);
-        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
+        // (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a8_s, allGTCastingValues.b32_s, amount, allAllowanceValues.allowance32_s);
+        // require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
 
-        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a32_s, allGTCastingValues.b8_s, amount, allAllowanceValues.allowance32_s);
-        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
+        // (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a32_s, allGTCastingValues.b8_s, amount, allAllowanceValues.allowance32_s);
+        // require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
 
-        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a16_s, allGTCastingValues.b32_s, amount, allAllowanceValues.allowance32_s);
-        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
+        // (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a16_s, allGTCastingValues.b32_s, amount, allAllowanceValues.allowance32_s);
+        // require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
 
-        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a32_s, allGTCastingValues.b16_s, amount, allAllowanceValues.allowance32_s);
-        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
+        // (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a32_s, allGTCastingValues.b16_s, amount, allAllowanceValues.allowance32_s);
+        // require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && new_allowance== MpcCore.decrypt(newAllowance_s), "transferWithAllowanceTest: check scalar failed");
     }
 
     function computeAndCheckTransfer64(AllGTCastingValues memory allGTCastingValues, AllAllowanceValues memory allAllowanceValues, uint8 amount) public {
