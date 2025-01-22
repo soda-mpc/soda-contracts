@@ -1,7 +1,5 @@
 import os
-import sys
-sys.path.append('soda-sdk')
-from python.crypto import generate_rsa_keypair, sign, recover_user_key
+from soda_python_sdk import generate_rsa_keypair, sign, recover_user_key
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 import logging
 

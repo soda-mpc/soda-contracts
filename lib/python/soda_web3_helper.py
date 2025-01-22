@@ -9,7 +9,7 @@ import argparse
 from time import sleep
 
 LOCAL_PROVIDER_URL = 'http://localhost:7001'
-REMOTE_HTTP_PROVIDER_URL = 'http://ec2-184-73-147-220.compute-1.amazonaws.com:7000' 
+REMOTE_HTTP_PROVIDER_URL = 'http://23.20.98.154:7000'
 SOLC_VERSION = '0.8.19'
 DEFAULT_GAS_PRICE = 30
 DEFAULT_GAS_LIMIT = 10000000

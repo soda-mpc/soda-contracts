@@ -2,7 +2,7 @@ import os
 from eth_account import Account
 import sys
 sys.path.append('soda-sdk')
-from python.crypto import decrypt, prepare_IT, block_size
+from soda_python_sdk import prepare_IT, BLOCK_SIZE as block_size, decrypt
 from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL, REMOTE_HTTP_PROVIDER_URL
 from web3.exceptions import TransactionNotFound
 from time import sleep
