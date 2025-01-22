@@ -13,63 +13,89 @@ git clone git@github.com:soda-mpc/soda-contracts.git
 cd soda-contracts
 ```
 
-<details>
-<summary>Tab 1 Title</summary>
-### Section 1
-Content for section 1 under Tab 1.
-### Section 2
-More detailed information under Tab 1.
-</details>
-<details>
-<summary>Tab 2 Title</summary>
-### Section 1
-Content for section 1 under Tab 2.
-### Section 2
-More detailed information under Tab 2.
-</details>
+
 
 # Installation Instructions
 
 Follow these steps to install dependencies and build the necessary components for your project.
 
-## Install Dependencies
+<details>
+<summary>Python</summary>
 
-
-### Python 3.9
 Check installed python version
 ```bash
 python3 --version
 ```
-
-If your python is not 3.9 or 3.10
-```bash
-sudo add-apt-repository ppa:deadsnakes/ppa
-sudo apt update
-sudo apt install python3.9
-```
+If Python is not installed, install version 3.9 or higher by following the installation guide for your operating system.
 
 #### Install Python Dependencies
-
+Create virtualenv
 ```bash
 python3 -m virtualenv sodanet
 source sodanet/bin/activate
+```
+Install dependencies
+```bash
 pip install -r requirements.txt
 ```
+</details>
+
+<details>
+<summary>JavaScript</summary>
+Ensure node.js and npm installed on your system. You can check the installed versions using the following commands:
+
+```bash
+node -v
+npm -v
+```
+If node is not installed, install it following the instructions for your OS
+
 
 #### Install Javascript Dependencies
 
 ```bash
 npm install
 ```
+</details>
 
 ### Solidity
-For Solidity, use the curl command to download and install the stable version:
+
+<details>
+<summary>
+  Linux
+</summary>
 
 ```bash
 SOLC_VERSION="stable" && \
-curl -L https://github.com/ethereum/solidity/releases/download/v${SOLC_VERSION}/solc-static-linux -o /usr/local/bin/solc && \
+curl -L "https://github.com/ethereum/solidity/releases/download/v${SOLC_VERSION}/solc-static-linux" -o /usr/local/bin/solc && \
 chmod +x /usr/local/bin/solc
 ```
+
+**Note:**
+- Replace `"stable"` with a specific version (e.g., `"0.8.21"`) if you need a particular release.
+- Ensure `curl` and `chmod` are available on your system (Linux/macOS) or use an alternative download tool for Windows if necessary.
+
+</details>
+<details>
+<summary>
+  macOS
+</summary>
+
+```bash
+brew update && brew upgrade
+brew tap ethereum/ethereum
+brew install solidity
+```
+
+</details>
+<details>
+<summary>
+  Windows
+</summary>
+
+1. Download the precompiled Solidity binary from the [Solidity Releases](https://github.com/ethereum/solidity/releases) page.
+2. Add the binary to your system’s PATH to use `solc` from the command line.
+</details>
 
 # Getting started
 
@@ -84,16 +110,20 @@ This step generates a new private key and account.
 * Script: The script named gen_account, available in both Python and JavaScript, is provided to facilitate the generation of user accounts.
 
 * Execution: To execute the script, navigate to the main directory (soda-contracts) and run the appropriate command depending on the language choice:
+    <details>
+    <summary>Python</summary>
 
     ```bash
     python3 -m onboardUser.scripts.python.gen_account
     ```
-
-    or
+    </details>
+    <details>
+    <summary>JavaScript</summary>
 
     ```bash
     node onboardUser/scripts/js/gen_account.mjs
     ```
+    </details>
 
 * Output: The script will create a new account and save the private key in a .env file in the user's file system.
 
@@ -105,14 +135,7 @@ This step generates a new private key and account.
 
 ### 2. Get some coins
 
-This step involves acquiring native coins or tokens that are required to interact with the system. The system provides a Telegram-built faucet for users to request tokens easily through simple commands and interactions within the Telegram chat interface.
-
-* Faucet Interaction: Users can initiate a conversation with the telegram faucet handle [@SodaFaucet_bot](https://t.me/SodaFaucet_bot). 
-
-    In a DM with the bot, send:
-        
-    can I have some soda? &lt;an ethereum wallet address&gt;
-
+This step involves acquiring native coins or tokens required to interact with the system. The user can obtain these coins from a faucet: [http://testnet.faucet.sodalabs.net](http://testnet.faucet.sodalabs.net)
 
 ### 3. Onboard the account to the system
 Once the account is created and funded with native coins, it needs to be onboarded to the system to obtain an AES key. This AES key may be used for encryption and decryption purposes within the system.
@@ -120,16 +143,20 @@ Once the account is created and funded with native coins, it needs to be onboard
 * Script: The script named onboard_user, available in both Python and JavaScript, is provided to facilitate the the onboarding process.
 
 * Execution: Similar to step 1, navigate to the main directory (soda-contracts) and run the appropriate command depending on the language choice:
+    <details>
+    <summary>Python</summary>
 
     ```bash
-    python3 -m onboardUser.scripts.python.onboard_user
+    python3 -m onboardUser.scripts.python.onboard_user Remote
     ```
-
-    or
+    </details>
+    <details>
+    <summary>JavaScript</summary>
 
     ```bash
-    node onboardUser/scripts/js/onboard_user.mjs
+    node onboardUser/scripts/js/onboard_user.mjs Remote
     ```
+    </details>
 
 * Output: After running the script, an AES key is added to the .env file.
 
@@ -167,15 +194,20 @@ The run_private_erc20 script is designed to demonstrate the functionality of ERC
 
 * Execution: Navigate to the main directory (soda-contracts) and run the appropriate command depending on the language choice:
 
-    ```bash
-    python3 -m examples.scripts.python.run_private_erc20
-    ```
-
-    or
+    <details>
+    <summary>Python</summary>
 
     ```bash
-    node examples/scripts/js/run_private_erc20.mjs
+    python3 -m examples.scripts.python.run_private_erc20 Remote
     ```
+    </details>
+    <details>
+    <summary>JavaScript</summary>
+
+    ```bash
+    node examples/scripts/js/run_private_erc20.mjs Remote
+    ```
+    </details>
 
 * Script output: Upon execution, the script will perform various ERC20 functionalities, such as transferring tokens, approving transactions, and retrieving token balances. The output of these operations will be printed to the terminal or command prompt screen.
 
@@ -201,7 +233,7 @@ To execute the tests script, follow these steps:
         Run the following command to execute the tests script:
 
         ```bash
-        python3 -m tests.scripts.python.run_precompile_tests_contract
+        python3 -m tests.scripts.python.run_precompile_tests_contract Remote
         ```
 
 * Script Output:
