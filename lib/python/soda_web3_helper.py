@@ -15,7 +15,7 @@ LOCAL_PROVIDER_PORT = os.environ.get('LOCAL_PROVIDER_PORT', '7000')
 LOCAL_PROVIDER_URL = f'http://localhost:{LOCAL_PROVIDER_PORT}'
 REMOTE_HTTP_PROVIDER_URL = 'http://23.20.98.154:7000'
 SOLC_VERSION = '0.8.19'
-DEFAULT_GAS_PRICE = 30
+DEFAULT_GAS_PRICE = 3000000000
 DEFAULT_GAS_LIMIT = 10000000
 DEFAULT_CHAIN_ID = 50505050
 BLOCK_SIZE = 32
@@ -560,3 +560,6 @@ def compile_contract(
     contract_bytecode = f'0x{bytecode}'
     
     return contract_bytecode, contract_abi
+
+0.00000000000000003
+0.00000003
