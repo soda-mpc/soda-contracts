@@ -1,7 +1,7 @@
 # soda-contracts
 Welcome to the Soda bubble soda-contracts, where smart contract privacy is finally made possible on the EVM.
 Here you fill find all the tools and example that will help you get started.
-Our network is typically reachable on `node.sodalabs.net:7000`, if you are already familiar
+Our testnet network is typically reachable on `http://23.20.98.154:7000`, if you are already familiar
 with smart contracts developments you could use any tool you are used to in order to interact with the Bubble devnet.
 
 If you prefer using our tools for deploying and running EVM smart contracts, below you would find the instructions for
@@ -13,11 +13,27 @@ git clone git@github.com:soda-mpc/soda-contracts.git
 cd soda-contracts
 ```
 
+<details>
+<summary>Tab 1 Title</summary>
+### Section 1
+Content for section 1 under Tab 1.
+### Section 2
+More detailed information under Tab 1.
+</details>
+<details>
+<summary>Tab 2 Title</summary>
+### Section 1
+Content for section 1 under Tab 2.
+### Section 2
+More detailed information under Tab 2.
+</details>
+
 # Installation Instructions
 
 Follow these steps to install dependencies and build the necessary components for your project.
 
 ## Install Dependencies
+
 
 ### Python 3.9
 Check installed python version
