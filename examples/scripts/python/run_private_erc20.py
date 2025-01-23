@@ -3,7 +3,9 @@ from eth_account import Account
 import sys
 sys.path.append('soda-sdk')
 from soda_python_sdk import prepare_IT, BLOCK_SIZE as block_size, decrypt
-from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL, REMOTE_HTTP_PROVIDER_URL
+from lib.python.soda_web3_helper import (SodaWeb3Helper, LOCAL_PROVIDER_URL,
+                                         REMOTE_HTTP_PROVIDER_URL, DEFAULT_GAS_LIMIT,
+                                         DEFAULT_GAS_PRICE)
 from web3.exceptions import TransactionNotFound
 from time import sleep
 import logging
@@ -53,9 +55,9 @@ def get_encrypted_balance(soda_helper, account, contract):
     raise Exception("Failed to find balance of the account address in the transaction receipt.")
     return None
 
-def execute_transaction(soda_helper, account, contract, function):
+def execute_transaction(soda_helper, account, contract, function, gas_limit=DEFAULT_GAS_LIMIT, gas_price=DEFAULT_GAS_PRICE):
     global NONCE
-    tx_hash = soda_helper.call_contract_function_transaction_async("private_erc20", function, NONCE)
+    tx_hash = soda_helper.call_contract_function_transaction_async("private_erc20", function, NONCE, gas_limit=gas_limit, gas_price=gas_price)
     NONCE += 1
     return tx_hash
 
@@ -106,7 +108,7 @@ def main(provider_url: str, use_eip191_signature: bool):
         raise Exception("Failed to set up the contract")
 
     # Deploy the contract
-    receipt = soda_helper.deploy_contract("private_erc20", constructor_args=["Soda", "SOD", INITIAL_BALANCE])
+    receipt = soda_helper.deploy_contract("private_erc20", constructor_args=["Soda", "SOD", INITIAL_BALANCE], gas_limit=5_000_000)
     if receipt is None:
         raise Exception("Failed to deploy the contract")
 
@@ -116,16 +118,16 @@ def main(provider_url: str, use_eip191_signature: bool):
     NONCE = soda_helper.get_current_nonce()
 
     print("************* View functions *************")
-    name = contract.functions.name().call({'from': account.address})
+    name = contract.functions.name().call({'from': account.address, 'gas': 1000000})
     print("Function call result name:", name)
 
-    symbol = contract.functions.symbol().call({'from': account.address})
+    symbol = contract.functions.symbol().call({'from': account.address, 'gas': 1000000})
     print("Function call result symbol:", symbol)
 
-    decimals = contract.functions.decimals().call({'from': account.address})
+    decimals = contract.functions.decimals().call({'from': account.address, 'gas': 1000000})
     print("Function call result decimals:", decimals)
 
-    totalSupply = contract.functions.totalSupply().call({'from': account.address})
+    totalSupply = contract.functions.totalSupply().call({'from': account.address, 'gas': 1000000})
     print("Function call result totalSupply:", totalSupply)
 
     user_key_hex = os.environ.get('USER_KEY')
@@ -139,12 +141,12 @@ def main(provider_url: str, use_eip191_signature: bool):
     print("************* Transfer clear ", plaintext_integer, " to Alice *************")
     # Transfer 5 SOD to Alice
     function = contract.functions.transfer(alice_address.address, plaintext_integer, True)
-    execute_transaction(soda_helper, account, contract, function)
+    execute_transaction(soda_helper, account, contract, function, gas_limit=500000)
 
     print("************* Transfer clear ", plaintext_integer, " to Alice *************")
     # Transfer 5 SOD to Alice
     function = contract.functions.contractTransferClear(alice_address.address, plaintext_integer)
-    execute_transaction(soda_helper, account, contract, function)
+    execute_transaction(soda_helper, account, contract, function, gas_limit=500000)
 
     print("************* Transfer IT ", plaintext_integer, " to Alice *************")
     # In order to generate the input text, we need to use some data of the function.
@@ -160,12 +162,12 @@ def main(provider_url: str, use_eip191_signature: bool):
     # Create the real function using the prepared IT
     function = contract.functions.transfer(alice_address.address, ct, signature, False)
     # Transfer 5 SOD to Alice
-    execute_transaction(soda_helper, account, contract, function)
+    execute_transaction(soda_helper, account, contract, function, gas_limit=500000)
 
     print("************* Transfer clear ", plaintext_integer, " from my account to Alice without allowance *************")
     # Trying to transfer 5 SOD to Alice. There is no allowance, transfer should fail
     function = contract.functions.transferFrom(account.address, alice_address.address, plaintext_integer, True)
-    execute_transaction(soda_helper, account, contract, function)
+    execute_transaction(soda_helper, account, contract, function, gas_limit=500000)
 
     print("************* Approve ", plaintext_integer*10, " to my address *************")
     # Set allowance for this account
@@ -176,12 +178,12 @@ def main(provider_url: str, use_eip191_signature: bool):
     print("************* Transfer clear ", plaintext_integer, " from my account to Alice *************")
     # Transfer 5 SOD to Alice
     function = contract.functions.transferFrom(account.address, alice_address.address, plaintext_integer, True)
-    execute_transaction(soda_helper, account, contract, function)
+    execute_transaction(soda_helper, account, contract, function, gas_limit=500000)
 
     print("************* Transfer clear ", plaintext_integer, " from my account to Alice *************")
     # Transfer 5 SOD to Alice
     function = contract.functions.contractTransferFromClear(account.address, alice_address.address, plaintext_integer)
-    execute_transaction(soda_helper, account, contract, function)
+    execute_transaction(soda_helper, account, contract, function, gas_limit=500000)
 
     print("************* Transfer IT ", plaintext_integer, " from my account to Alice *************")
     # Transfer 5 SOD to Alice
@@ -191,7 +193,7 @@ def main(provider_url: str, use_eip191_signature: bool):
     ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]), use_eip191_signature)
     # Create the real function using the prepared IT
     function = contract.functions.transferFrom(account.address, alice_address.address, ct, signature, False)
-    tx_hash = execute_transaction(soda_helper, account, contract, function)
+    tx_hash = execute_transaction(soda_helper, account, contract, function, gas_limit=500000)
     tx_receipt = None
     while tx_receipt is None:
         try:

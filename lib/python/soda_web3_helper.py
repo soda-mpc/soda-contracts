@@ -33,6 +33,22 @@ def parse_url_parameter():
     else:
         return args.provider_url
 
+def get_user_key_shares(account, contract, receipt):
+    user_key_events = contract.events.UserKey().process_receipt(receipt)
+
+    key_0_share = None
+    key_1_share = None
+    # Filter events for the specific address
+    for event in user_key_events:
+        if event['args']['_owner'].lower() == account.address.lower():
+            key_0_share = event['args']['_keyShare0']
+            key_1_share = event['args']['_keyShare1']
+
+    if key_0_share is None or key_1_share is None:
+        raise Exception("Failed to find the key shares of the account address in the transaction receipt.")
+
+    return key_0_share, key_1_share
+
 class SodaWeb3Helper:
     def __init__(self, private_key_string, http_provider_url):
         self.private_key = private_key_string
@@ -68,6 +84,16 @@ class SodaWeb3Helper:
         if contract_id not in self.contracts:
             raise Exception(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
         return self.contracts[contract_id]
+
+    def update_contract_address(self, contract_id, contract_address):
+        if contract_id not in self.contracts:
+            raise Exception(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
+
+        self.contracts[contract_id] = self.web3.eth.contract(
+            address=contract_address,
+            abi=self.contracts[contract_id].abi,
+            bytecode=self.contracts[contract_id].bytecode)
+        return True
 
     def get_account(self):
         return self.account

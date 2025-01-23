@@ -90,7 +90,7 @@ async function main() {
     } else {
         // Deploy the contract
         console.log("Deploying contract...");
-        let receipt = await sodaHelper.deployContract(contractId);
+        let receipt = await sodaHelper.deployContract(contractId, [], 950_000);
         if (!receipt) {
             throw new Error("Failed to deploy the contract")
         }
@@ -104,7 +104,7 @@ async function main() {
     // Call the getUserKey function to get the encrypted AES key
     const estimatedGas = await sodaHelper.estimateGas(contractId, "getUserKey", [publicKey, signedEK]);
     console.log("Estimated gas required:", estimatedGas);
-    const receipt = await sodaHelper.callContractTransaction(contractId, "getUserKey", [publicKey, signedEK]);
+    const receipt = await sodaHelper.callContractTransaction(contractId, "getUserKey", [publicKey, signedEK], 650_000);
     if (!receipt){
         throw new Error("Failed to call the transaction function")
     }
