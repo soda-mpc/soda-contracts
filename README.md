@@ -66,13 +66,13 @@ npm install
 </summary>
 
 ```bash
-SOLC_VERSION="stable" && \
+SOLC_VERSION="0.8.19" && \
 curl -L "https://github.com/ethereum/solidity/releases/download/v${SOLC_VERSION}/solc-static-linux" -o /usr/local/bin/solc && \
 chmod +x /usr/local/bin/solc
 ```
 
 **Note:**
-- Replace `"stable"` with a specific version (e.g., `"0.8.21"`) if you need a particular release.
+- Update SOLC_VERSION with a specific version (e.g., `"0.8.19"`) if you need a particular release.
 - Ensure `curl` and `chmod` are available on your system (Linux/macOS) or use an alternative download tool for Windows if necessary.
 
 </details>
