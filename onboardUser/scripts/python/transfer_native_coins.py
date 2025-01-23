@@ -7,7 +7,7 @@ from web3.exceptions import TransactionNotFound, ContractLogicError
 MAX_GAS_PRICE = 1000
 INCREASE_PERCENT = 1.15
 
-def transfer_to_account(sender_account_key, receiver_account, provider_url, amount_to_transfer=3):
+def transfer_to_account(sender_account_key, receiver_account, provider_url, amount_to_transfer=100):
     print(f"Sender account key: {sender_account_key}")
     soda_helper = SodaWeb3Helper(sender_account_key, provider_url)
     sender_balance = soda_helper.get_native_currency_balance(soda_helper.account.address)
@@ -47,7 +47,7 @@ def transfer_to_account(sender_account_key, receiver_account, provider_url, amou
     print(f"Balance of the receiver account: {receiver_balance}")
     
 
-def main(sender_account_key, provider_url, amount_to_transfer=3):
+def main(sender_account_key, provider_url, amount_to_transfer=100):
     signing_key = os.environ.get('SIGNING_KEY')
     receiver_account = Account.from_key(signing_key)
     print(f"Receiver account address: {receiver_account.address}")
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('sender_account_key', type=str, help='The private key of the sender account')
     parser.add_argument('provider_url', type=str, help='The node url')
-    parser.add_argument('--amount_to_transfer', type=int, default=3, help='The amount to transfer')
+    parser.add_argument('--amount_to_transfer', type=int, default=100, help='The amount to transfer')
     args = parser.parse_args()
     print(f'Provider URL: {args.provider_url}')
     if not args.provider_url:
