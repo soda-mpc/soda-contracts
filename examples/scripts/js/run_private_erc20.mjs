@@ -186,12 +186,12 @@ async function main() {
     console.log("************* Transfer clear ", plaintext_integer, " to Alice *************");
     // Transfer 5 SOD to Alice
     let func = contract.methods.transfer(alice_address.address, plaintext_integer, true);
-    await execute_transaction(sodaHelper, func, 1000000);
+    await execute_transaction(sodaHelper, func);
 
     console.log("************* Transfer clear ", plaintext_integer, " to Alice *************");
     // Transfer 5 SOD to Alice
     func = contract.methods.contractTransferClear(alice_address.address, plaintext_integer);
-    await execute_transaction(sodaHelper, func, 1000000);
+    await execute_transaction(sodaHelper, func);
 
     console.log("************* Transfer IT ", plaintext_integer, " to Alice *************")
     // In order to generate the input text, we need to use some data of the function. 
@@ -206,8 +206,8 @@ async function main() {
     let {ctInt, signature} = prepareIT(
       plaintext_integer,
       user_key,
-      Buffer.from(account.address.slice(2), 'hex'),
-      Buffer.from(contract.options.address.slice(2), 'hex'),
+      Buffer.from(account.address.toString().slice(2), 'hex'),
+      Buffer.from(contract.options.address.toString().slice(2), 'hex'),
       hashFuncSig,
       Buffer.from(SIGNING_KEY.slice(2), 'hex'),
       useEIP191
@@ -246,17 +246,17 @@ async function main() {
     ({ctInt, signature} = prepareIT(
       plaintext_integer,
       user_key,
-      Buffer.from(account.address.slice(2), 'hex'),
-      Buffer.from(contract.options.address.slice(2), 'hex'),
-      hashFuncSig, Buffer.from(SIGNING_KEY.slice(2), 'hex'),
+      Buffer.from(account.address.toString().slice(2), 'hex'),
+      Buffer.from(contract.options.address.toString().slice(2), 'hex'),
+      hashFuncSig,
+      Buffer.from(SIGNING_KEY.slice(2), 'hex'),
       useEIP191)
     );
     // Create the real function using the prepared IT output
     func = contract.methods.transferFrom(account.address, alice_address.address, ctInt, signature, false);
-    const tx_hash = await execute_transaction(sodaHelper, func, contract)
+    let hash = await execute_transaction(sodaHelper, func, contract)
+    await sodaHelper.waitForTransactionReceipt(hash)
 
-    await sodaHelper.waitForTransactionReceipt(tx_hash);
-    
     console.log("************* Check my balance *************")
     await checkBalance(sodaHelper, contract, user_key, INITIAL_BALANCE - 6*plaintext_integer);
     
