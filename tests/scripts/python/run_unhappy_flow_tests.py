@@ -2,9 +2,7 @@ import logging
 import os
 from eth_account import Account
 from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
-import sys
-sys.path.append('soda-sdk')
-from python.crypto import generate_rsa_keypair, sign, recover_user_key, prepare_IT
+from soda_python_sdk import generate_rsa_keypair, sign, recover_user_key, prepare_IT
 
 SIGNATURE_SIZE = 65
 

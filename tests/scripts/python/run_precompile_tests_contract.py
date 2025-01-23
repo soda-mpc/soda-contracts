@@ -2,10 +2,8 @@ import argparse
 from datetime import datetime
 import logging
 import os
-import sys
 from time import sleep
-sys.path.append('soda-sdk')
-from python.crypto import generate_aes_key, write_aes_key, generate_rsa_keypair, recover_user_key, sign, decrypt, prepare_IT
+from soda_python_sdk import generate_rsa_keypair, recover_user_key, sign, decrypt, prepare_IT
 from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL, REMOTE_HTTP_PROVIDER_URL
 from web3.exceptions import TransactionNotFound
 from eth_account import Account
