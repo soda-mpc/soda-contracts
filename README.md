@@ -1,5 +1,5 @@
 # soda-contracts
-Welcome to the Soda bubble soda-contracts, where smart contract privacy is finally made possible on the EVM.
+Welcome to the Soda soda-contracts, where smart contract privacy is finally made possible on the EVM.
 Here you fill find all the tools and example that will help you get started.
 Our testnet network is typically reachable on `http://23.20.98.154:7000`, if you are already familiar
 with smart contracts developments you could use any tool you are used to in order to interact with the Bubble devnet.
@@ -26,7 +26,13 @@ Check installed python version
 ```bash
 python3 --version
 ```
-If Python is not installed, install version 3.9 or higher by following the installation guide for your operating system.
+
+If your python is not 3.9 or 3.10
+```bash
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update
+sudo apt install python3.9
+```
 
 #### Install Python Dependencies
 Create virtualenv
@@ -66,13 +72,11 @@ npm install
 </summary>
 
 ```bash
-SOLC_VERSION="0.8.19" && \
-curl -L "https://github.com/ethereum/solidity/releases/download/v${SOLC_VERSION}/solc-static-linux" -o /usr/local/bin/solc && \
+curl -L "https://github.com/ethereum/solidity/releases/download/v0.8.19/solc-static-linux" -o /usr/local/bin/solc && \
 chmod +x /usr/local/bin/solc
 ```
 
 **Note:**
-- Update SOLC_VERSION with a specific version (e.g., `"0.8.19"`) if you need a particular release.
 - Ensure `curl` and `chmod` are available on your system (Linux/macOS) or use an alternative download tool for Windows if necessary.
 
 </details>
