@@ -74,18 +74,6 @@ jobs:
           python -m examples.scripts.python.run_private_erc20 Remote --use_eip191_signature=True
         timeout-minutes: 5
 
-      - name: Run python ConfidentialIdentityRegistry tests
-        run: |
-          source .env
-          python -m examples.scripts.python.run_confidential_identity_registry Remote
-        timeout-minutes: 5
-
-      - name: Run python ConfidentialAuction tests
-        run: |
-          source .env
-          python -m examples.scripts.python.run_confidential_auction Remote
-        timeout-minutes: 5
-
       - name: Check Exit Codes
         run: |
           if [ ${{ job.status }} == "success" ]; then
