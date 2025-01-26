@@ -2,7 +2,7 @@
 Welcome to the Soda soda-contracts, where smart contract privacy is finally made possible on the EVM.
 Here you will find all the tools and example that will help you get started.
 Our testnet network is typically reachable on `http://testnet.node.sodalabs.net:7000`, if you are already familiar
-with smart contracts developments you could use any tool you are used to in order to interact with the Soda Bubble testnet.
+with smart contracts developments you could use any tool you are used to in order to interact with the Soda testnet.
 
 If you prefer using our tools for deploying and running EVM smart contracts, below you would find the instructions for
 installing all the necessary dependencies for getting started. 
