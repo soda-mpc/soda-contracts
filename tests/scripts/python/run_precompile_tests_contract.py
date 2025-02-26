@@ -24,9 +24,15 @@ SOLIDITY_FILES = ['PrecompilesArythmeticTestsContract.sol',
                   'PrecompilesComparison1TestsContract.sol',
                   'PrecompilesOffboardToUserKeyTestContract.sol',
                   'PrecompilesCheckedFuncsTestsContract.sol',
+                  'PrecompilesCheckedWithOverflowFuncsTestsContract.sol',
+                  'PrecompilesCheckedWithOverflowFuncs1TestsContract.sol',
                   'PrecompilesSHATestsContract.sol']
 NONCE = 0
 MAX_SLEEP_TIME = 600
+MAX_UINT_8 = 255
+MAX_UINT_16 = 65535
+MAX_UINT_32 = 4294967295
+MAX_UINT_64 = 18446744073709551615
 
 timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 OUTPUT_FILE = f'mpc_test_output.txt'
@@ -96,19 +102,40 @@ def test_addition(soda_helper, contract, a, b):
     return execute_transaction_with_gas_estimation("addition", soda_helper, contract, "addTest", func_args=[a, b])
 
 def test_checked_addition(soda_helper, contract, a, b):
-    return execute_transaction("checked addition", soda_helper, contract, "checkedAddTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("checked addition", soda_helper, contract, "checkedAddTest", func_args=[a, b])
+
+def test_checked_addition_with_overflow_bit(soda_helper, contract, a, b):
+    return execute_transaction_with_gas_estimation("checked addition with overflow bit", soda_helper, contract, "checkedAddWithOverflowBitTest", func_args=[a, b])
+
+# Test Checked Addition that should overflow
+def test_checked_addition_overflow(soda_helper, contract, a, b, a16, b16, a32, b32, a64, b64):
+    return execute_transaction_with_gas_estimation("checked addition overflow", soda_helper, contract, "checkedAddOverflowTest", func_args=[a, b, a16, b16, a32, b32, a64, b64])
 
 def test_subtraction(soda_helper, contract, a, b):
     return execute_transaction_with_gas_estimation("subtraction", soda_helper, contract, "subTest", func_args=[a, b])
 
 def test_checked_subtraction(soda_helper, contract, a, b):
-    return execute_transaction("checked subtraction", soda_helper, contract, "checkedSubTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("checked subtraction", soda_helper, contract, "checkedSubTest", func_args=[a, b])
+
+def test_checked_subtraction_with_overflow_bit(soda_helper, contract, a, b):
+    return execute_transaction_with_gas_estimation("checked subtraction with overflow bit", soda_helper, contract, "checkedSubWithOverflowBitTest", func_args=[a, b])
+
+# Test Checked Subtraction that should overflow
+def test_checked_subtraction_overflow(soda_helper, contract, a, b):
+    return execute_transaction_with_gas_estimation("checked subtraction overflow", soda_helper, contract, "checkedSubOverflowTest", func_args=[a, b])
 
 def test_multiplication(soda_helper, contract, a, b):
     return execute_transaction_with_gas_estimation("multiplication", soda_helper, contract, "mulTest", func_args=[a, b])
 
 def test_checked_multiplication(soda_helper, contract, a, b):
-    return execute_transaction("checked multiplication", soda_helper, contract, "checkedMulTest", func_args=[a, b])
+    return execute_transaction_with_gas_estimation("checked multiplication", soda_helper, contract, "checkedMulTest", func_args=[a, b])
+
+def test_checked_multiplication_with_overflow_bit(soda_helper, contract, a, b):
+    return execute_transaction_with_gas_estimation("checked multiplication with overflow bit", soda_helper, contract, "checkedMulWithOverflowBitTest", func_args=[a, b])
+
+# Test Checked Multiplication that should overflow
+def test_checked_multiplication_overflow(soda_helper, contract, a, b, a16, b16, a32, b32, a64, b64):
+    return execute_transaction_with_gas_estimation("checked multiplication overflow", soda_helper, contract, "checkedMulOverflowTest", func_args=[a, b, a16, b16, a32, b32, a64, b64])
 
 def test_division(soda_helper, contract, a, b):
     return execute_transaction_with_gas_estimation("division", soda_helper, contract, "divTest", func_args=[a, b])
@@ -263,17 +290,39 @@ def checkResults(soda_helper, expected_results, private_key):
     result = soda_helper.call_contract_view('PrecompilesCheckedFuncsTestsContract.sol', "getAddResult")
     check_expected_result("checked_addition", expected_results["checked_addition"], result)
 
+    overflow_bit, result = soda_helper.call_contract_view('PrecompilesCheckedWithOverflowFuncsTestsContract.sol', "getAddResult")
+    check_expected_result("checked_addition_with_overflow_bit", expected_results["checked_addition_overflow_res"], result)
+    check_expected_result("checked_addition_with_overflow_bit", expected_results["checked_addition_overflow_bit"], overflow_bit)
+
+    overflow_bit = soda_helper.call_contract_view('PrecompilesCheckedWithOverflowFuncsTestsContract.sol', "getAddOverflow")
+    check_expected_result("checked_addition_overflow", expected_results["checked_addition_overflow"], overflow_bit)
+
     result = soda_helper.call_contract_view('PrecompilesArythmeticTestsContract.sol', "getSubResult")
     check_expected_result("subtract", expected_results["subtract"], result)
 
     result = soda_helper.call_contract_view('PrecompilesCheckedFuncsTestsContract.sol', "getSubResult")
     check_expected_result("checked_subtract", expected_results["checked_subtract"], result)
 
+    overflow_bit, result = soda_helper.call_contract_view('PrecompilesCheckedWithOverflowFuncsTestsContract.sol', "getSubResult")
+    check_expected_result("checked_subtract_with_overflow_bit", expected_results["checked_subtract_overflow_res"], result)
+    check_expected_result("checked_subtract_with_overflow_bit", expected_results["checked_subtract_overflow_bit"], overflow_bit)
+
+    overflow_bit = soda_helper.call_contract_view('PrecompilesCheckedWithOverflowFuncsTestsContract.sol', "getSubOverflow")
+    check_expected_result("checked_subtract_overflow", expected_results["checked_subtract_overflow"], overflow_bit)
+
     result = soda_helper.call_contract_view('PrecompilesArythmeticTestsContract.sol', "getMulResult")
     check_expected_result("multiplication", expected_results["multiplication"], result)
 
     result = soda_helper.call_contract_view('PrecompilesCheckedFuncsTestsContract.sol', "getMulResult")
     check_expected_result("checked_multiplication", expected_results["multiplication"], result)
+
+    overflow_bit, result = soda_helper.call_contract_view('PrecompilesCheckedWithOverflowFuncs1TestsContract.sol', "getMulResult")
+    check_expected_result("checked_multiplication_with_overflow_bit", expected_results["checked_multiplication_overflow_res"], result)
+    check_expected_result("checked_multiplication_with_overflow_bit", expected_results["checked_multiplication_overflow_bit"], overflow_bit)
+
+    overflow_bit = soda_helper.call_contract_view('PrecompilesCheckedWithOverflowFuncs1TestsContract.sol', "getMulOverflow")
+    check_expected_result("checked_multiplication_overflow", expected_results["checked_multiplication_overflow"], overflow_bit)
+
 
     result = soda_helper.call_contract_view('PrecompilesMiscellaneousTestsContract.sol', "getDivResult")
     check_expected_result("division", expected_results["division"], result)
@@ -428,6 +477,19 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance,
     tx_hash = test_checked_addition(soda_helper, 'PrecompilesCheckedFuncsTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "checked_addition"
     expected_results["checked_addition"] = a+b
+
+    # Test Checked Addition with Overflow Bit
+    print_with_timestamp("Run checked addition with overflow bit test...")
+    tx_hash = test_checked_addition_with_overflow_bit(soda_helper, 'PrecompilesCheckedWithOverflowFuncsTestsContract.sol', a, b)
+    tx_hashes[tx_hash] = "checked_addition_with_overflow_bit"
+    expected_results["checked_addition_overflow_res"] = a+b
+    expected_results["checked_addition_overflow_bit"] = True if a+b < a else False
+
+    # Test Checked Addition that should overflow
+    print_with_timestamp("Run overflow addition test ...")
+    tx_hash = test_checked_addition_overflow(soda_helper, 'PrecompilesCheckedWithOverflowFuncsTestsContract.sol', MAX_UINT_8, a, MAX_UINT_16, b, MAX_UINT_32, a, MAX_UINT_64, b)
+    tx_hashes[tx_hash] = "checked_addition_overflow"
+    expected_results["checked_addition_overflow"] = True
     
     # Test Subtraction
     print_with_timestamp("Run subtraction test...")
@@ -441,6 +503,19 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance,
     tx_hashes[tx_hash] = "checked_subtract"
     expected_results["checked_subtract"] = a-b
 
+    # Test Checked Subtraction with Overflow Bit
+    print_with_timestamp("Run checked subtraction with overflow bit test...")
+    tx_hash = test_checked_subtraction_with_overflow_bit(soda_helper, 'PrecompilesCheckedWithOverflowFuncsTestsContract.sol', a, b)
+    tx_hashes[tx_hash] = "checked_subtract_with_overflow_bit"
+    expected_results["checked_subtract_overflow_res"] = a-b
+    expected_results["checked_subtract_overflow_bit"] = True if a-b > a else False
+
+    # Test Checked Subtraction that should overflow
+    print_with_timestamp("Run overflow subtraction test ...")
+    tx_hash = test_checked_subtraction_overflow(soda_helper, 'PrecompilesCheckedWithOverflowFuncsTestsContract.sol', a, MAX_UINT_8)
+    tx_hashes[tx_hash] = "checked_subtraction_overflow"
+    expected_results["checked_subtract_overflow"] = True
+
     # Test Multiplication
     print_with_timestamp("Run multiplication test...")
     tx_hash = test_multiplication(soda_helper, 'PrecompilesArythmeticTestsContract.sol', a, b)
@@ -451,6 +526,19 @@ def run_tests(soda_helper, a, b, shift, bit, numBits, bool_a, bool_b, allowance,
     print_with_timestamp("Run checked multiplication test...")
     tx_hash = test_checked_multiplication(soda_helper, 'PrecompilesCheckedFuncsTestsContract.sol', a, b)
     tx_hashes[tx_hash] = "checked_multiplication"
+
+    # Test checked Multiplication
+    print_with_timestamp("Run checked multiplication with overflow bit test...")
+    tx_hash = test_checked_multiplication_with_overflow_bit(soda_helper, 'PrecompilesCheckedWithOverflowFuncs1TestsContract.sol', a, b)
+    tx_hashes[tx_hash] = "checked_multiplication"
+    expected_results["checked_multiplication_overflow_res"] = a*b
+    expected_results["checked_multiplication_overflow_bit"] = True if a*b < a else False
+
+    # Test Checked Addition that should overflow
+    print_with_timestamp("Run overflow multiplication test ...")
+    tx_hash = test_checked_multiplication_overflow(soda_helper, 'PrecompilesCheckedWithOverflowFuncs1TestsContract.sol', MAX_UINT_8, a, MAX_UINT_16, b, MAX_UINT_32, a, MAX_UINT_64, b)
+    tx_hashes[tx_hash] = "checked_multiplication_overflow"
+    expected_results["checked_multiplication_overflow"] = True
 
     # Test Division
     print_with_timestamp("Run division test...")
