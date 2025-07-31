@@ -31,7 +31,7 @@ jobs:
           node onboardUser/scripts/js/onboard_user.mjs Remote
         timeout-minutes: 5
         env:
-          DISABLE_GAS_ESTIMATION: "false"
+          DISABLE_GAS_ESTIMATION: "true"
 
       - name: Run js ERC20
         run: |
@@ -56,11 +56,11 @@ jobs:
           python -m onboardUser.scripts.python.onboard_user Remote
         timeout-minutes: 5
 
-#      - name: Run tests
-#        run: |
-#          source .env
-#          python -m tests.scripts.python.run_precompile_tests_contract Remote
-#        timeout-minutes: 15
+      - name: Run tests
+        run: |
+          source .env
+          python -m tests.scripts.python.run_precompile_tests_contract Remote
+        timeout-minutes: 5
 
       - name: Run python ERC20 tests
         run: |
