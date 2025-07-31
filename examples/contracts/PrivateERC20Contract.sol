@@ -121,6 +121,12 @@ contract PrivateERC20Contract {
     //         _value: the encrypted value of the amount to transfer
     // returns: The encrypted result of the transfer.
     function contractTransfer(address _to, gtUint64 _value) public returns (gtBool success){
+        // Check for self-transfer
+        if (msg.sender == _to) {
+            emit Transfer(msg.sender, _to);
+            return MpcCore.setPublic(true);
+        }
+        
         (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(msg.sender, _to);
         (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result) = MpcCore.transfer(fromBalance, toBalance, _value);
 
@@ -135,6 +141,12 @@ contract PrivateERC20Contract {
     //         _value: the value of the amount to transfer
     // returns: The encrypted result of the transfer.
     function contractTransferClear(address _to, uint64 _value) public returns (gtBool success){
+        // Check for self-transfer
+        if (msg.sender == _to) {
+            emit Transfer(msg.sender, _to, _value);
+            return MpcCore.setPublic(true);
+        }
+        
         (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(msg.sender, _to);
         (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result) = MpcCore.transfer(fromBalance, toBalance, _value);
 
@@ -186,6 +198,12 @@ contract PrivateERC20Contract {
     //         _value: the encrypted value of the amount to transfer
     // returns: The encrypted result of the transfer.
     function contractTransferFrom(address _from, address _to, gtUint64 _value) public returns (gtBool success){
+        // Check for self-transfer
+        if (_from == _to) {
+            emit Transfer(_from, _to);
+            return MpcCore.setPublic(true);
+        }
+        
         (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(_from, _to);
         gtUint64 allowance = MpcCore.onBoard(getGTAllowance(_from, msg.sender));
         (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result, gtUint64 newAllowance) = MpcCore.transferWithAllowance(fromBalance, toBalance, _value, allowance);
@@ -203,6 +221,12 @@ contract PrivateERC20Contract {
     //         _value: the value of the amount to transfer
     // returns: The encrypted result of the transfer.
     function contractTransferFromClear(address _from, address _to, uint64 _value) public returns (gtBool success){
+        // Check for self-transfer
+        if (_from == _to) {
+            emit Transfer(_from, _to, _value);
+            return MpcCore.setPublic(true);
+        }
+        
         (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(_from, _to);
         gtUint64 allowance = MpcCore.onBoard(getGTAllowance(_from, msg.sender));
         (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result, gtUint64 newAllowance) = MpcCore.transferWithAllowance(fromBalance, toBalance, _value, allowance);
