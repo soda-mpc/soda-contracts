@@ -257,6 +257,11 @@ async function main() {
     let hash = await execute_transaction(sodaHelper, func, contract)
     await sodaHelper.waitForTransactionReceipt(hash)
 
+    console.log("************* Check balance before self transfers *************");
+    const balanceBeforeSelfTransfers = await getEncryptedBalance(sodaHelper, contract);
+    const decryptedBalanceBefore = decryptValue(balanceBeforeSelfTransfers, user_key);
+    console.log("Balance before self transfers:", decryptedBalanceBefore);
+
     console.log("************* Self-transfer clear ", plaintext_integer, " to myself *************");
     // Self-transfer 5 SOD to myself using transfer function
     func = contract.methods.transfer(account.address, plaintext_integer, true);
@@ -309,6 +314,18 @@ async function main() {
     func = contract.methods.transferFrom(account.address, account.address, ctInt, signature, false);
     hash = await execute_transaction(sodaHelper, func);
     await sodaHelper.waitForTransactionReceipt(hash);
+
+    console.log("************* Check balance after self transfers *************");
+    const balanceAfterSelfTransfers = await getEncryptedBalance(sodaHelper, contract);
+    const decryptedBalanceAfter = decryptValue(balanceAfterSelfTransfers, user_key);
+    console.log("Balance after self transfers:", decryptedBalanceAfter);
+    
+    // Verify that balance remains the same after self transfers
+    if (decryptedBalanceBefore === decryptedBalanceAfter) {
+        console.log("✅ Self transfers successful: balance unchanged");
+    } else {
+        throw new Error(`❌ Self transfers failed: balance changed from ${decryptedBalanceBefore} to ${decryptedBalanceAfter}`);
+    }
 
     console.log("************* Check my balance *************")
     await checkBalance(sodaHelper, contract, user_key, INITIAL_BALANCE - 6*plaintext_integer);
