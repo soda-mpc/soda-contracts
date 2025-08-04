@@ -3,9 +3,9 @@ pragma solidity ^0.8.19;
 
 import "MpcCore.sol";
 
-// The provided Solidity contract is an implementation of an ERC20 token standard with enhanced privacy features. 
+// The provided Solidity contract is an implementation of an ERC20 token standard with enhanced privacy features.
 // It aims to ensure the confidentiality of token transactions through encryption techniques while maintaining compatibility with the ERC20 standard.
-// 
+//
 // Key Features:
 // Privacy Enhancement:
 // The contract utilizes encryption techniques to encrypt sensitive data such as token balances and allowances. Encryption is performed using both user-specific and system-wide encryption keys to safeguard transaction details.
@@ -32,8 +32,8 @@ contract PrivateERC20Contract {
     string private _symbol;
     uint8 private _decimals = 5;    // Sets the number of decimal places for token amounts. Here, _decimals is 5,
                                     // allowing for transactions with precision up to 0.00001 tokens.
-    uint256 private _totalSupply;  
-    
+    uint256 private _totalSupply;
+
     // Mapping of balances of the token holders
     // The balances are stored encrypted by the system aes key
     mapping(address => ctUint64) private balances;
@@ -67,13 +67,13 @@ contract PrivateERC20Contract {
         return _totalSupply;
     }
 
-    // The function returns the encrypted account balance utilizing the user's secret key. 
-    // Since the balance is initially encrypted internally using the system's AES key, the user cannot access it. 
-    // Thus, the balance undergoes re-encryption using the user's secret key. 
+    // The function returns the encrypted account balance utilizing the user's secret key.
+    // Since the balance is initially encrypted internally using the system's AES key, the user cannot access it.
+    // Thus, the balance undergoes re-encryption using the user's secret key.
     // As a result, the function is not designated as a "view" function.
     function balanceOf() public returns (ctUint64){
         ctUint64 balance = balances[msg.sender];
-        // The balance is saved encrypted using the system key. However, to allow the user to access it, the balance needs to be re-encrypted using the user key. 
+        // The balance is saved encrypted using the system key. However, to allow the user to access it, the balance needs to be re-encrypted using the user key.
         // Therefore, we decrypt the balance (onBoard) and then encrypt it again using the user key (offBoardToUser).
         gtUint64 balanceGt = MpcCore.onBoard(balance);
         ctUint64 userBalance = MpcCore.offBoardToUser(balanceGt, msg.sender);
@@ -126,7 +126,7 @@ contract PrivateERC20Contract {
             emit Transfer(msg.sender, _to);
             return MpcCore.setPublic(true);
         }
-        
+
         (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(msg.sender, _to);
         (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result) = MpcCore.transfer(fromBalance, toBalance, _value);
 
@@ -146,7 +146,7 @@ contract PrivateERC20Contract {
             emit Transfer(msg.sender, _to, _value);
             return MpcCore.setPublic(true);
         }
-        
+
         (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(msg.sender, _to);
         (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result) = MpcCore.transfer(fromBalance, toBalance, _value);
 
@@ -198,15 +198,17 @@ contract PrivateERC20Contract {
     //         _value: the encrypted value of the amount to transfer
     // returns: The encrypted result of the transfer.
     function contractTransferFrom(address _from, address _to, gtUint64 _value) public returns (gtBool success){
+
+        (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(_from, _to);
+        gtUint64 allowance = MpcCore.onBoard(getGTAllowance(_from, msg.sender));
+
         // Check for self-transfer
         if (_from == _to) {
             emit Transfer(_from, _to);
             gtBool hasSufficientAllowance = MpcCore.ge(allowance, _value);
             return hasSufficientAllowance;
         }
-        
-        (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(_from, _to);
-        gtUint64 allowance = MpcCore.onBoard(getGTAllowance(_from, msg.sender));
+
         (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result, gtUint64 newAllowance) = MpcCore.transferWithAllowance(fromBalance, toBalance, _value, allowance);
 
         setApproveValue(_from, msg.sender, MpcCore.offBoard(newAllowance));
@@ -222,6 +224,8 @@ contract PrivateERC20Contract {
     //         _value: the value of the amount to transfer
     // returns: The encrypted result of the transfer.
     function contractTransferFromClear(address _from, address _to, uint64 _value) public returns (gtBool success){
+        (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(_from, _to);
+        gtUint64 allowance = MpcCore.onBoard(getGTAllowance(_from, msg.sender));
         // Check for self-transfer
         if (_from == _to) {
             emit Transfer(_from, _to, _value);
@@ -229,9 +233,6 @@ contract PrivateERC20Contract {
             gtBool hasSufficientAllowance = MpcCore.ge(allowance, valueGt);
             return hasSufficientAllowance;
         }
-        
-        (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(_from, _to);
-        gtUint64 allowance = MpcCore.onBoard(getGTAllowance(_from, msg.sender));
         (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result, gtUint64 newAllowance) = MpcCore.transferWithAllowance(fromBalance, toBalance, _value, allowance);
 
         setApproveValue(_from, msg.sender, MpcCore.offBoard(newAllowance));
