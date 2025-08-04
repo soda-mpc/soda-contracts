@@ -201,7 +201,8 @@ contract PrivateERC20Contract {
         // Check for self-transfer
         if (_from == _to) {
             emit Transfer(_from, _to);
-            return MpcCore.setPublic(true);
+            gtBool hasSufficientAllowance = MpcCore.ge(allowance, _value);
+            return hasSufficientAllowance;
         }
         
         (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(_from, _to);
@@ -224,7 +225,9 @@ contract PrivateERC20Contract {
         // Check for self-transfer
         if (_from == _to) {
             emit Transfer(_from, _to, _value);
-            return MpcCore.setPublic(true);
+            gtUint64 valueGt = MpcCore.setPublic64(_value);
+            gtBool hasSufficientAllowance = MpcCore.ge(allowance, valueGt);
+            return hasSufficientAllowance;
         }
         
         (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(_from, _to);
