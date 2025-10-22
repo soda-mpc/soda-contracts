@@ -55,6 +55,8 @@ async function getEncryptedBalance(sodaHelper, contract){
     let func = contract.methods.balanceOf();
     const receipt = await sodaHelper.callContractFunctionTransaction(func);
 
+    nonce++; 
+
     // Processing the receipt to extract Balance events
     const balanceEvents = await contract.getPastEvents('Balance', {
         fromBlock: receipt.blockNumber,
