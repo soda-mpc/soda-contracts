@@ -7,12 +7,19 @@ type gtUint8 is uint256;
 type gtUint16 is uint256;
 type gtUint32 is uint256;
 type gtUint64 is uint256;
+type gtUint128 is uint256;
+type gtUint256 is uint256;
 
 type ctBool is uint256;
 type ctUint8 is uint256;
 type ctUint16 is uint256;
 type ctUint32 is uint256;
 type ctUint64 is uint256;
+type ctUint128 is uint256;
+struct ctUint256 {
+    ctUint128 ciphertextHigh;
+    ctUint128 ciphertextLow;
+}
 
 struct itBool {
     ctBool ciphertext;
@@ -34,6 +41,14 @@ struct itUint64 {
     ctUint64 ciphertext;
     bytes signature;
 }
+struct itUint128 {
+    ctUint128 ciphertext;
+    bytes signature;
+}
+struct itUint256 {
+    ctUint256 ciphertext;
+    bytes signature;
+}
 
 
 import "./MpcInterface.sol";
@@ -41,7 +56,7 @@ import "./MpcInterface.sol";
 
 library MpcCore {
 
-    enum MPC_TYPE {SBOOL_T , SUINT8_T , SUINT16_T, SUINT32_T ,SUINT64_T }
+    enum MPC_TYPE {SBOOL_T , SUINT8_T , SUINT16_T, SUINT32_T ,SUINT64_T , SUINT128_T, SUINT256_T }
     enum ARGS {BOTH_SECRET , LHS_PUBLIC, RHS_PUBLIC  }
     uint public constant RSA_SIZE = 256; 
 
@@ -62,8 +77,18 @@ library MpcCore {
     }
 
     function checkOverflow(gtBool bit) private {
+        // To revert on overflow, the require statement must fail when the overflow bit is set.
+        // Naturally, we would check that the overflow bit is 0.
+        // However, directly requiring the bit to be 0 causes gas estimation to fail, as it always returns 1.
+        // To handle this, we apply a NOT operation to the bit and require the result to be 1.
+        //
+        // Summary of all cases:
+        //  1. **Overflow scenario**: The overflow bit is 1 → NOT operation returns 0 → require fails → transaction reverts.
+        //  2. **No overflow**: The overflow bit is 0 → NOT operation returns 1 → require passes → transaction proceeds.
+        //  3. **Gas estimation**: Decrypt always returns 1 during gas estimation → require passes → no impact on actual execution.
+        gtBool notBit = not(bit);
         // revert on overflow
-        require(decrypt(bit) == false, "overflow error");
+        require(decrypt(notBit) == true, "overflow error");
     }
 
     function checkRes8(gtBool bit, gtUint8 res) private returns (gtUint8) {
@@ -91,6 +116,22 @@ library MpcCore {
     }
 
     function checkRes64(gtBool bit, gtUint64 res) private returns (gtUint64) {
+        // revert on overflow
+        checkOverflow(bit);
+
+        // return the output if there is no overflow
+        return res;
+    }
+
+    function checkRes128(gtBool bit, gtUint128 res) private returns (gtUint128) {
+        // revert on overflow
+        checkOverflow(bit);
+
+        // return the output if there is no overflow
+        return res;
+    }
+
+    function checkRes256(gtBool bit, gtUint256 res) private returns (gtUint256) {
         // revert on overflow
         checkOverflow(bit);
 
@@ -252,6 +293,13 @@ library MpcCore {
 
         return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
     }
+    
+    function checkedAddWithOverflowBit(gtUint8 a, gtUint8 b) internal returns (gtBool, gtUint8) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint8.wrap(res));
+    }
 
     function sub(gtUint8 a, gtUint8 b) internal returns (gtUint8) {
          return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
@@ -264,6 +312,13 @@ library MpcCore {
 
         return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
     }
+    
+    function checkedSubWithOverflowBit(gtUint8 a, gtUint8 b) internal returns (gtBool, gtUint8) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint8.wrap(res));
+    }
 
     function mul(gtUint8 a, gtUint8 b) internal returns (gtUint8) {
          return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
@@ -274,6 +329,12 @@ library MpcCore {
         (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint8.unwrap(b));
         return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint8 a, gtUint8 b) internal returns (gtBool, gtUint8) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint8.unwrap(b));
+        return (gtBool.wrap(bit), gtUint8.wrap(res));
     }
 
     function div(gtUint8 a, gtUint8 b) internal returns (gtUint8) {
@@ -410,6 +471,13 @@ library MpcCore {
 
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
+    
+    function checkedAddWithOverflowBit(gtUint16 a, gtUint16 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
+    }
 
     function sub(gtUint16 a, gtUint16 b) internal returns (gtUint16) {
          return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
@@ -423,6 +491,13 @@ library MpcCore {
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint16 a, gtUint16 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
     function mul(gtUint16 a, gtUint16 b) internal returns (gtUint16) {
         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint16.unwrap(b)));
@@ -433,6 +508,13 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint16.unwrap(b));
 
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint16 a, gtUint16 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
     function div(gtUint16 a, gtUint16 b) internal returns (gtUint16) {
@@ -570,6 +652,13 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(gtUint32 a, gtUint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
     function sub(gtUint32 a, gtUint32 b) internal returns (gtUint32) {
         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint32.unwrap(b)));
@@ -582,6 +671,13 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint32 a, gtUint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
     function mul(gtUint32 a, gtUint32 b) internal returns (gtUint32) {
         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint32.unwrap(b)));
@@ -592,6 +688,13 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint32.unwrap(b));
         
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint32 a, gtUint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint32.unwrap(b));
+        
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
     function div(gtUint32 a, gtUint32 b) internal returns (gtUint32) {
@@ -730,6 +833,13 @@ library MpcCore {
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(gtUint64 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
     function sub(gtUint64 a, gtUint64 b) internal returns (gtUint64) {
          return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint64.unwrap(b)));
@@ -742,6 +852,13 @@ library MpcCore {
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint64 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
     function mul(gtUint64 a, gtUint64 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint64.unwrap(b)));
@@ -752,6 +869,13 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint64.unwrap(b));
 
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint64 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
     function div(gtUint64 a, gtUint64 b) internal returns (gtUint64) {
@@ -841,6 +965,370 @@ library MpcCore {
         return (gtUint64.wrap(new_a), gtUint64.wrap(new_b), gtBool.wrap(res), gtUint64.wrap(new_allowance));
     }
 
+    // =========== 128 bit operations ==============
+
+    function validateCiphertext(itUint128 memory input) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            ValidateCiphertext(bytes1(uint8(MPC_TYPE.SUINT128_T)), ctUint128.unwrap(input.ciphertext), input.signature));
+    }
+
+    function onBoard(ctUint128 ct) internal returns (gtUint128) {
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            OnBoard(bytes1(uint8(MPC_TYPE.SUINT128_T)), ctUint128.unwrap(ct)));
+    }
+
+    function offBoard(gtUint128 pt) internal returns (ctUint128) {
+          return ctUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            OffBoard(bytes1(uint8(MPC_TYPE.SUINT128_T)), gtUint128.unwrap(pt)));
+    }
+
+    function offBoardToUser(gtUint128 pt, address addr) internal returns (ctUint128) {
+          return ctUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            OffBoardToUser(bytes1(uint8(MPC_TYPE.SUINT128_T)), gtUint128.unwrap(pt), abi.encodePacked(addr)));
+    }
+
+    function setPublic128(uint128 pt) internal returns (gtUint128) {
+          return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            SetPublic(bytes1(uint8(MPC_TYPE.SUINT128_T)), uint256(pt)));
+    }
+
+    function rand128() internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).Rand(bytes1(uint8(MPC_TYPE.SUINT128_T))));
+    }
+
+    function randBoundedBits128(uint8 numBits) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).RandBoundedBits(bytes1(uint8(MPC_TYPE.SUINT128_T)), numBits));
+    }
+
+    function decrypt(gtUint128 ct) internal returns (uint128){
+          return uint128(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Decrypt(bytes1(uint8(MPC_TYPE.SUINT128_T)), gtUint128.unwrap(ct)));
+    }
+
+    function transfer(gtUint128 a, gtUint128 b, gtUint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function add(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function checkedAdd(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint128 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function sub(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function checkedSub(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint128 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function mul(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function checkedMul(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint128 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function div(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function rem(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function and(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function or(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function xor(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function eq(gtUint128 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function ne(gtUint128 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function ge(gtUint128 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function gt(gtUint128 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function le(gtUint128 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function lt(gtUint128 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function min(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function max(gtUint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function mux(gtBool bit, gtUint128 a, gtUint128 b) internal returns (gtUint128){
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint128.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+
+
+    // =========== 256 bit operations ==============
+
+    function validateCiphertext(itUint256 memory input) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            ValidateCiphertext(bytes1(uint8(MPC_TYPE.SUINT256_T)), ctUint128.unwrap(input.ciphertext.ciphertextHigh), ctUint128.unwrap(input.ciphertext.ciphertextLow), input.signature));
+    }
+
+    function onBoard(ctUint256 memory ct) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            OnBoard(bytes1(uint8(MPC_TYPE.SUINT256_T)), ctUint128.unwrap(ct.ciphertextHigh), ctUint128.unwrap(ct.ciphertextLow)));
+    }
+
+    function offBoard(gtUint256 pt) internal returns (ctUint256 memory) {
+        (uint256 ctHigh, uint256 ctLow) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            OffBoard256(bytes1(uint8(MPC_TYPE.SUINT256_T)), gtUint256.unwrap(pt));
+        ctUint256 memory ct = ctUint256({ciphertextHigh: ctUint128.wrap(ctHigh), ciphertextLow: ctUint128.wrap(ctLow)});
+        return ct;
+    }
+
+    function offBoardToUser(gtUint256 pt, address addr) internal returns (ctUint256 memory) {
+        (uint256 ctHigh, uint256 ctLow) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            OffBoardToUser256(bytes1(uint8(MPC_TYPE.SUINT256_T)), gtUint256.unwrap(pt), abi.encodePacked(addr));
+        ctUint256 memory ct = ctUint256({ciphertextHigh: ctUint128.wrap(ctHigh), ciphertextLow: ctUint128.wrap(ctLow)});
+        return ct;
+    }
+
+    function setPublic256(uint256 pt) internal returns (gtUint256) {
+          return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            SetPublic(bytes1(uint8(MPC_TYPE.SUINT256_T)), uint256(pt)));
+    }
+
+    function rand256() internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).Rand(bytes1(uint8(MPC_TYPE.SUINT256_T))));
+    }
+
+    function randBoundedBits256(uint8 numBits) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).RandBoundedBits(bytes1(uint8(MPC_TYPE.SUINT256_T)), numBits));
+    }
+
+    function decrypt(gtUint256 ct) internal returns (uint256){
+        return uint256(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Decrypt(bytes1(uint8(MPC_TYPE.SUINT256_T)), gtUint256.unwrap(ct)));
+    }
+
+    function transfer(gtUint256 a, gtUint256 b, gtUint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function add(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function checkedAdd(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint256 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function sub(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function checkedSub(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint256 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function mul(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function checkedMul(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint256 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function div(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function rem(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function and(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function or(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function xor(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function eq(gtUint256 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function ne(gtUint256 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function ge(gtUint256 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function gt(gtUint256 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function le(gtUint256 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function lt(gtUint256 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function min(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function max(gtUint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function mux(gtBool bit, gtUint256 a, gtUint256 b) internal returns (gtUint256){
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint256.unwrap(a), gtUint256.unwrap(b)));
+    }
+
 
 
 
@@ -859,6 +1347,13 @@ library MpcCore {
         return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(uint8 a, gtUint8 b) internal returns (gtBool, gtUint8) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), uint256(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint8.wrap(res));
+    }
+
     function sub(uint8 a, gtUint8 b) internal returns (gtUint8) {
          return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), uint256(a), gtUint8.unwrap(b)));
@@ -871,6 +1366,13 @@ library MpcCore {
         return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(uint8 a, gtUint8 b) internal returns (gtBool, gtUint8) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), uint256(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint8.wrap(res));
+    }
+
     function mul(uint8 a, gtUint8 b) internal returns (gtUint8) {
          return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), uint256(a), gtUint8.unwrap(b)));
@@ -881,6 +1383,13 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), uint256(a), gtUint8.unwrap(b));
 
         return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(uint8 a, gtUint8 b) internal returns (gtBool, gtUint8) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), uint256(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint8.wrap(res));
     }
 
     function div(uint8 a, gtUint8 b) internal returns (gtUint8) {
@@ -967,6 +1476,13 @@ library MpcCore {
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(uint16 a, gtUint16 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), uint256(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
     function sub(uint16 a, gtUint16 b) internal returns (gtUint16) {
         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), uint256(a), gtUint16.unwrap(b)));
@@ -979,6 +1495,13 @@ library MpcCore {
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(uint16 a, gtUint16 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), uint256(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
     function mul(uint16 a, gtUint16 b) internal returns (gtUint16) {
         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), uint256(a), gtUint16.unwrap(b)));
@@ -989,6 +1512,13 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), uint256(a), gtUint16.unwrap(b));
 
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(uint16 a, gtUint16 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), uint256(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
     function div(uint16 a, gtUint16 b) internal returns (gtUint16) {
@@ -1076,6 +1606,13 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(uint32 a, gtUint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), uint256(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
     function sub(uint32 a, gtUint32 b) internal returns (gtUint32) {
          return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), uint256(a), gtUint32.unwrap(b)));
@@ -1088,6 +1625,13 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(uint32 a, gtUint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), uint256(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
     function mul(uint32 a, gtUint32 b) internal returns (gtUint32) {
         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), uint256(a), gtUint32.unwrap(b)));
@@ -1098,6 +1642,13 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), uint256(a), gtUint32.unwrap(b));
 
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(uint32 a, gtUint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), uint256(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
     function div(uint32 a, gtUint32 b) internal returns (gtUint32) {
@@ -1185,6 +1736,13 @@ library MpcCore {
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(uint64 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), uint256(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
     function sub(uint64 a, gtUint64 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), uint256(a), gtUint64.unwrap(b)));
@@ -1197,6 +1755,13 @@ library MpcCore {
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(uint64 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), uint256(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
     function mul(uint64 a, gtUint64 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), uint256(a), gtUint64.unwrap(b)));
@@ -1207,6 +1772,13 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), uint256(a), gtUint64.unwrap(b));
 
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(uint64 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), uint256(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
     function div(uint64 a, gtUint64 b) internal returns (gtUint64) {
@@ -1279,7 +1851,266 @@ library MpcCore {
             Mux(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtBool.unwrap(bit), uint256(a), gtUint64.unwrap(b)));
     }
 
-    
+    // =========== 128 bit operations ==============
+
+    function add(uint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function checkedAdd(uint128 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(uint128 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function sub(uint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function checkedSub(uint128 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(uint128 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function mul(uint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function checkedMul(uint128 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(uint128 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function div(uint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function rem(uint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function and(uint128 a, gtUint128 b) internal returns (gtUint128) {
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function or(uint128 a, gtUint128 b) internal returns (gtUint128) {
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function xor(uint128 a, gtUint128 b) internal returns (gtUint128) {
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function eq(uint128 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function ne(uint128 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function ge(uint128 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function gt(uint128 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function le(uint128 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function lt(uint128 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function min(uint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function max(uint128 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), uint256(a), gtUint128.unwrap(b)));
+    }
+
+    function mux(gtBool bit, uint128 a, gtUint128 b) internal returns (gtUint128){
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtBool.unwrap(bit), uint256(a), gtUint128.unwrap(b)));
+    }
+
+
+    // =========== 256 bit operations ==============
+
+    function add(uint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function checkedAdd(uint256 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(uint256 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function sub(uint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function checkedSub(uint256 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(uint256 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function mul(uint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function checkedMul(uint256 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(uint256 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function div(uint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function rem(uint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function and(uint256 a, gtUint256 b) internal returns (gtUint256) {
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function or(uint256 a, gtUint256 b) internal returns (gtUint256) {
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function xor(uint256 a, gtUint256 b) internal returns (gtUint256) {
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function eq(uint256 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function ne(uint256 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function ge(uint256 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function gt(uint256 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function le(uint256 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function lt(uint256 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function min(uint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function max(uint256 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), uint256(a), gtUint256.unwrap(b)));
+    }
+
+    function mux(gtBool bit, uint256 a, gtUint256 b) internal returns (gtUint256){
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtBool.unwrap(bit), uint256(a), gtUint256.unwrap(b)));
+    }
+
+
  // =========== Operations with RHS_PUBLIC parameter ===========
  // =========== 8 bit operations ==============
 
@@ -1295,6 +2126,13 @@ library MpcCore {
         return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(gtUint8 a, uint8 b) internal returns (gtBool, gtUint8) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint8.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint8.wrap(res));
+    }
+
     function sub(gtUint8 a, uint8 b) internal returns (gtUint8) {
         return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint8.unwrap(a), uint256(b)));
@@ -1307,6 +2145,13 @@ library MpcCore {
         return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint8 a, uint8 b) internal returns (gtBool, gtUint8) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint8.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint8.wrap(res));
+    }
+
     function mul(gtUint8 a, uint8 b) internal returns (gtUint8) {
         return gtUint8.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint8.unwrap(a), uint256(b)));
@@ -1317,6 +2162,13 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint8.unwrap(a), uint256(b));
 
         return checkRes8(gtBool.wrap(bit), gtUint8.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint8 a, uint8 b) internal returns (gtBool, gtUint8) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint8.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint8.wrap(res));
     }
 
     function div(gtUint8 a, uint8 b) internal returns (gtUint8) {
@@ -1413,6 +2265,13 @@ library MpcCore {
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(gtUint16 a, uint16 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.RHS_PUBLIC), gtUint16.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
     function sub(gtUint16 a, uint16 b) internal returns (gtUint16) {
         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.RHS_PUBLIC), gtUint16.unwrap(a), uint256(b)));
@@ -1425,6 +2284,13 @@ library MpcCore {
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint16 a, uint16 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.RHS_PUBLIC), gtUint16.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
     function mul(gtUint16 a, uint16 b) internal returns (gtUint16) {
         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.RHS_PUBLIC), gtUint16.unwrap(a), uint256(b)));
@@ -1435,6 +2301,13 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.RHS_PUBLIC), gtUint16.unwrap(a), uint256(b));
 
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint16 a, uint16 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.RHS_PUBLIC), gtUint16.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
     function div(gtUint16 a, uint16 b) internal returns (gtUint16) {
@@ -1532,6 +2405,13 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(gtUint32 a, uint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.RHS_PUBLIC), gtUint32.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
     function sub(gtUint32 a, uint32 b) internal returns (gtUint32) {
         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.RHS_PUBLIC), gtUint32.unwrap(a), uint256(b)));
@@ -1544,6 +2424,13 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint32 a, uint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.RHS_PUBLIC), gtUint32.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
     function mul(gtUint32 a, uint32 b) internal returns (gtUint32) {
         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.RHS_PUBLIC), gtUint32.unwrap(a), uint256(b)));
@@ -1554,6 +2441,13 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.RHS_PUBLIC), gtUint32.unwrap(a), uint256(b));
 
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint32 a, uint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.RHS_PUBLIC), gtUint32.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
     function div(gtUint32 a, uint32 b) internal returns (gtUint32) {
@@ -1650,6 +2544,13 @@ library MpcCore {
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(gtUint64 a, uint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
     function sub(gtUint64 a, uint64 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b)));
@@ -1662,6 +2563,13 @@ library MpcCore {
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint64 a, uint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
     function mul(gtUint64 a, uint64 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b)));
@@ -1672,6 +2580,13 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b));
 
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint64 a, uint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
     function div(gtUint64 a, uint64 b) internal returns (gtUint64) {
@@ -1699,12 +2614,12 @@ library MpcCore {
             Xor(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b)));
     }
 
-    function shl(gtUint64 a, uint64 b) internal returns (gtUint64) {
+    function shl(gtUint64 a, uint8 b) internal returns (gtUint64) {
           return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Shl(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b)));
     }
 
-    function shr(gtUint64 a, uint64 b) internal returns (gtUint64) {
+    function shr(gtUint64 a, uint8 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Shr(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint64.unwrap(a), uint256(b)));
     }
@@ -1753,6 +2668,287 @@ library MpcCore {
          return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mux(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.RHS_PUBLIC), gtBool.unwrap(bit), gtUint64.unwrap(a), uint256(b)));
     }
+
+    // =========== 128 bit operations ==============
+
+    function add(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function checkedAdd(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint128 a, uint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function sub(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function checkedSub(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint128 a, uint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function mul(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function checkedMul(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint128 a, uint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function div(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function rem(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function and(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function or(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function xor(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function eq(gtUint128 a, uint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function ne(gtUint128 a, uint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function ge(gtUint128 a, uint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function gt(gtUint128 a, uint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function le(gtUint128 a, uint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function lt(gtUint128 a, uint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function min(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function max(gtUint128 a, uint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function shl(gtUint128 a, uint8 b) internal returns (gtUint128) {
+          return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Shl(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function shr(gtUint128 a, uint8 b) internal returns (gtUint128) {
+          return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint128.unwrap(a), uint256(b)));
+    }
+
+    function mux(gtBool bit, gtUint128 a, uint128 b) internal returns (gtUint128){
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.RHS_PUBLIC), gtBool.unwrap(bit), gtUint128.unwrap(a), uint256(b)));
+    }
+
+
+    // 256 bit operations
+
+    
+    function add(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function checkedAdd(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint256 a, uint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function sub(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function checkedSub(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint256 a, uint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function mul(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function checkedMul(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint256 a, uint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function div(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function rem(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function and(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function or(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function xor(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function eq(gtUint256 a, uint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function ne(gtUint256 a, uint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function ge(gtUint256 a, uint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function gt(gtUint256 a, uint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function le(gtUint256 a, uint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function lt(gtUint256 a, uint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function min(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function max(gtUint256 a, uint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function shl(gtUint256 a, uint8 b) internal returns (gtUint256) {
+          return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Shl(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function shr(gtUint256 a, uint8 b) internal returns (gtUint256) {
+          return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.RHS_PUBLIC), gtUint256.unwrap(a), uint256(b)));
+    }
+
+    function mux(gtBool bit, gtUint256 a, uint256 b) internal returns (gtUint256){
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.RHS_PUBLIC), gtBool.unwrap(bit), gtUint256.unwrap(a), uint256(b)));
+    }
+
 
     // In the context of a transfer, scalar balances are irrelevant;
 	// The only possibility for a scalar value is within the "amount" parameter.
@@ -1852,6 +3048,128 @@ library MpcCore {
         (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
             Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint32.unwrap(b), uint256(amount));
         return (gtUint64.wrap(new_a), gtUint64.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint128 b, uint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint128.unwrap(b), uint256(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint8 a, gtUint128 b, uint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint128.unwrap(b), uint256(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint8 b, uint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint8.unwrap(b), uint256(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint16 a, gtUint128 b, uint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint128.unwrap(b), uint256(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint16 b, uint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint16.unwrap(b), uint256(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint32 a, gtUint128 b, uint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint128.unwrap(b), uint256(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint32 b, uint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint32.unwrap(b), uint256(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint64 a, gtUint128 b, uint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint128.unwrap(b), uint256(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint64 b, uint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint64.unwrap(b), uint256(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    // =========== Transfer functions for public amount ==============
+
+    function transfer(gtUint256 a, gtUint256 b, uint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint256.unwrap(b), uint256(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint8 a, gtUint256 b, uint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint256.unwrap(b), uint256(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint8 b, uint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint8.unwrap(b), uint256(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint16 a, gtUint256 b, uint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint256.unwrap(b), uint256(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint16 b, uint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint16.unwrap(b), uint256(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint32 a, gtUint256 b, uint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint256.unwrap(b), uint256(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint32 b, uint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint32.unwrap(b), uint256(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint64 a, gtUint256 b, uint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint256.unwrap(b), uint256(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint64 b, uint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint64.unwrap(b), uint256(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint256 b, uint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint256.unwrap(b), uint256(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint128 b, uint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint128.unwrap(b), uint256(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
     }
 
     function transferWithAllowance(gtUint8 a, gtUint8 b, uint8 amount, gtUint8 allowance) internal returns (gtUint8, gtUint8, gtBool, gtUint8){
@@ -2159,6 +3477,678 @@ library MpcCore {
             TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint32.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
         return (gtUint64.wrap(new_a), gtUint64.wrap(new_b), gtBool.wrap(res), gtUint64.wrap(new_allowance));
     }
+
+    // =========== Transfer With allowance 128 bit ==============
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, uint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, uint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, uint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, uint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, uint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, uint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, uint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint8.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, uint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, uint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint8.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, uint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, uint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint8.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, uint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, uint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint8.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, uint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, uint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint8.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, uint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, uint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint16.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, uint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, uint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint16.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, uint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, uint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint16.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, uint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, uint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint16.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, uint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, uint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint16.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, uint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, uint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint32.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, uint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, uint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint32.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, uint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, uint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint32.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, uint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, uint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint32.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, uint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, uint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint32.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, uint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, uint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint64.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, uint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, uint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint64.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, uint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, uint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint64.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, uint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, uint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint64.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, uint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, uint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+            (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+                TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint64.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+            return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+        }
+
+
+    // =========== Transfer with allowance functions for public amount ==============
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, uint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, uint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, uint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, uint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, uint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, uint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, uint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, uint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint8.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, uint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, uint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint8.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, uint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, uint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint8.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, uint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, uint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint8.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, uint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, uint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint8.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, uint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint8.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, uint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint8.unwrap(b), uint256(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, uint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, uint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint16.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, uint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, uint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint16.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, uint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, uint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint16.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, uint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, uint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint16.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, uint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, uint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint16.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, uint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint16.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, uint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint16.unwrap(b), uint256(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, uint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, uint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint32.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, uint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, uint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint32.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, uint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, uint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint32.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, uint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, uint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint32.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, uint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, uint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint32.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, uint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint32.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, uint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint32.unwrap(b), uint256(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, uint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, uint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint64.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, uint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, uint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint64.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, uint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, uint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint64.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, uint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, uint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint64.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, uint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, uint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint64.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, uint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint64.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, uint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint64.unwrap(b), uint256(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, uint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, uint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, uint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, uint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, uint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, uint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, uint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, uint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, uint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, uint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, uint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint128.unwrap(a), gtUint256.unwrap(b), uint256(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, uint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.LHS_PUBLIC), gtUint256.unwrap(a), gtUint128.unwrap(b), uint256(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
     
 
  // ================= Cast operation =================
@@ -2188,6 +4178,20 @@ library MpcCore {
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(gtUint8 a, gtUint16 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint16 a, gtUint8 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
     function sub(gtUint8 a, gtUint16 b) internal returns (gtUint16) {
          return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint16.unwrap(b)));
@@ -2212,6 +4216,20 @@ library MpcCore {
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint8 a, gtUint16 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint16 a, gtUint8 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
     function mul(gtUint8 a, gtUint16 b) internal returns (gtUint16) {
         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint16.unwrap(b)));
@@ -2234,6 +4252,20 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint8.unwrap(b));
 
         return checkRes16(gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint8 a, gtUint16 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint16 a, gtUint8 b) internal returns (gtBool, gtUint16) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint16.wrap(res));
     }
 
     function div(gtUint8 a, gtUint16 b) internal returns (gtUint16) {
@@ -2284,16 +4316,6 @@ library MpcCore {
     function xor(gtUint16 a, gtUint8 b) internal returns (gtUint16) {
         return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Xor(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint8.unwrap(b)));
-    }
-
-    function shr(gtUint8 a, gtUint16 b) internal returns (gtUint16) {
-        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
-            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint16.unwrap(b)));
-    }
-
-    function shr(gtUint16 a, gtUint8 b) internal returns (gtUint16) {
-        return gtUint16.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
-            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint8.unwrap(b)));
     }
 
     function eq(gtUint8 a, gtUint16 b) internal returns (gtBool) {
@@ -2517,6 +4539,20 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(gtUint8 a, gtUint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint32 a, gtUint8 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
     function sub(gtUint8 a, gtUint32 b) internal returns (gtUint32) {
          return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint32.unwrap(b)));
@@ -2541,6 +4577,20 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint8 a, gtUint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint32 a, gtUint8 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
     function mul(gtUint8 a, gtUint32 b) internal returns (gtUint32) {
         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint32.unwrap(b)));
@@ -2563,6 +4613,20 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint8.unwrap(b));
 
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint8 a, gtUint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint32 a, gtUint8 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
     function div(gtUint8 a, gtUint32 b) internal returns (gtUint32) {
@@ -2613,16 +4677,6 @@ library MpcCore {
     function xor(gtUint32 a, gtUint8 b) internal returns (gtUint32) {
         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Xor(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint8.unwrap(b)));
-    }
-
-    function shr(gtUint8 a, gtUint32 b) internal returns (gtUint32) {
-        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
-            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint32.unwrap(b)));
-    }
-
-    function shr(gtUint32 a, gtUint8 b) internal returns (gtUint32) {
-        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
-            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint8.unwrap(b)));
     }
 
     function eq(gtUint8 a, gtUint32 b) internal returns (gtBool) {
@@ -2931,6 +4985,20 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(gtUint16 a, gtUint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint32 a, gtUint16 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
     function sub(gtUint16 a, gtUint32 b) internal returns (gtUint32) {
          return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint32.unwrap(b)));
@@ -2955,6 +5023,20 @@ library MpcCore {
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint16 a, gtUint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint32 a, gtUint16 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
     function mul(gtUint16 a, gtUint32 b) internal returns (gtUint32) {
         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint32.unwrap(b)));
@@ -2977,6 +5059,20 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint16.unwrap(b));
 
         return checkRes32(gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint16 a, gtUint32 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint32 a, gtUint16 b) internal returns (gtBool, gtUint32) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint32.wrap(res));
     }
 
     function div(gtUint16 a, gtUint32 b) internal returns (gtUint32) {
@@ -3027,16 +5123,6 @@ library MpcCore {
     function xor(gtUint32 a, gtUint16 b) internal returns (gtUint32) {
         return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Xor(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint16.unwrap(b)));
-    }
-
-    function shr(gtUint16 a, gtUint32 b) internal returns (gtUint32) {
-        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
-            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint32.unwrap(b)));
-    }
-
-    function shr(gtUint32 a, gtUint16 b) internal returns (gtUint32) {
-        return gtUint32.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
-            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint16.unwrap(b)));
     }
 
     function eq(gtUint16 a, gtUint32 b) internal returns (gtBool) {
@@ -3355,6 +5441,20 @@ library MpcCore {
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(gtUint8 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint64 a, gtUint8 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
     function sub(gtUint8 a, gtUint64 b) internal returns (gtUint64) {
          return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint64.unwrap(b)));
@@ -3379,6 +5479,20 @@ library MpcCore {
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint8 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint64 a, gtUint8 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
     function mul(gtUint8 a, gtUint64 b) internal returns (gtUint64) {
          return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint64.unwrap(b)));
@@ -3401,6 +5515,20 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint8.unwrap(b));
 
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint8 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint64 a, gtUint8 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
     function div(gtUint8 a, gtUint64 b) internal returns (gtUint64) {
@@ -3451,16 +5579,6 @@ library MpcCore {
     function xor(gtUint64 a, gtUint8 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Xor(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint8.unwrap(b)));
-    }
-
-    function shr(gtUint8 a, gtUint64 b) internal returns (gtUint64) {
-        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
-            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint64.unwrap(b)));
-    }
-
-    function shr(gtUint64 a, gtUint8 b) internal returns (gtUint64) {
-        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
-            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint8.unwrap(b)));
     }
 
     function eq(gtUint8 a, gtUint64 b) internal returns (gtBool) {
@@ -3910,6 +6028,20 @@ library MpcCore {
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(gtUint16 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint64 a, gtUint16 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
     function sub(gtUint16 a, gtUint64 b) internal returns (gtUint64) {
          return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint64.unwrap(b)));
@@ -3934,6 +6066,20 @@ library MpcCore {
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint16 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint64 a, gtUint16 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
     function mul(gtUint16 a, gtUint64 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint64.unwrap(b)));
@@ -3956,6 +6102,20 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint16.unwrap(b));
 
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint16 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint64 a, gtUint16 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
     function div(gtUint16 a, gtUint64 b) internal returns (gtUint64) {
@@ -4006,16 +6166,6 @@ library MpcCore {
     function xor(gtUint64 a, gtUint16 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Xor(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint16.unwrap(b)));
-    }
-
-    function shr(gtUint16 a, gtUint64 b) internal returns (gtUint64) {
-        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
-            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint64.unwrap(b)));
-    }
-
-    function shr(gtUint64 a, gtUint16 b) internal returns (gtUint64) {
-        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
-            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint16.unwrap(b)));
     }
 
     function eq(gtUint16 a, gtUint64 b) internal returns (gtBool) {
@@ -4445,6 +6595,20 @@ library MpcCore {
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
+    function checkedAddWithOverflowBit(gtUint32 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint64 a, gtUint32 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
     function sub(gtUint32 a, gtUint64 b) internal returns (gtUint64) {
          return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Sub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint64.unwrap(b)));
@@ -4469,6 +6633,20 @@ library MpcCore {
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
+    function checkedSubWithOverflowBit(gtUint32 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint64 a, gtUint32 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
     function mul(gtUint32 a, gtUint64 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Mul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint64.unwrap(b)));
@@ -4491,6 +6669,20 @@ library MpcCore {
             CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint32.unwrap(b));
 
         return checkRes64(gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint32 a, gtUint64 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint64 a, gtUint32 b) internal returns (gtBool, gtUint64) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint64.wrap(res));
     }
 
     function div(gtUint32 a, gtUint64 b) internal returns (gtUint64) {
@@ -4541,16 +6733,6 @@ library MpcCore {
     function xor(gtUint64 a, gtUint32 b) internal returns (gtUint64) {
         return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
             Xor(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint32.unwrap(b)));
-    }
-
-    function shr(gtUint32 a, gtUint64 b) internal returns (gtUint64) {
-        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
-            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint64.unwrap(b)));
-    }
-
-    function shr(gtUint64 a, gtUint32 b) internal returns (gtUint64) {
-        return gtUint64.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
-            Shr(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint32.unwrap(b)));
     }
 
     function eq(gtUint32 a, gtUint64 b) internal returns (gtBool) {
@@ -4951,4 +7133,6682 @@ library MpcCore {
             gtUint64.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
         return (gtUint64.wrap(new_a), gtUint64.wrap(new_b), gtBool.wrap(res), gtUint64.wrap(new_allowance));
     }
+
+
+    // =========== Cast 128 bit operations ==============
+
+    // 128- 8 bit cast
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transfer(gtUint128 a, gtUint128 b, gtUint8 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transfer(gtUint128 a, gtUint128 b, gtUint16 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transfer(gtUint128 a, gtUint128 b, gtUint32 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transfer(gtUint128 a, gtUint128 b, gtUint64 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint128 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function add(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function add(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function sub(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function sub(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function mul(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function mul(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function div(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function div(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function rem(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function rem(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function and(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function and(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function or(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function or(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function xor(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function xor(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function eq(gtUint8 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function eq(gtUint128 a, gtUint8 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function ne(gtUint8 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function ne(gtUint128 a, gtUint8 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function ge(gtUint8 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function ge(gtUint128 a, gtUint8 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function gt(gtUint8 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function gt(gtUint128 a, gtUint8 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function le(gtUint8 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function le(gtUint128 a, gtUint8 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function lt(gtUint8 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function lt(gtUint128 a, gtUint8 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function min(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function min(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function max(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function max(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function checkedAdd(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAdd(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint8 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint128 a, gtUint8 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSub(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSub(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint8 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint128 a, gtUint8 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMul(gtUint8 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMul(gtUint128 a, gtUint8 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint8 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint128 a, gtUint8 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function mux(gtBool bit, gtUint8 a, gtUint128 b) internal returns (gtUint128){
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint8.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function mux(gtBool bit, gtUint128 a, gtUint8 b) internal returns (gtUint128){
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint128.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function transfer(gtUint8 a, gtUint128 b, gtUint8 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint8 b, gtUint8 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint8 a, gtUint128 b, gtUint16 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint8 b, gtUint16 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint8 a, gtUint128 b, gtUint32 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint8 b, gtUint32 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint8 a, gtUint128 b, gtUint64 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint8 b, gtUint64 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint8 a, gtUint128 b, gtUint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint8 b, gtUint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint8 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint128 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+
+
+    function add(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function add(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function sub(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function sub(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function mul(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function mul(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function div(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function div(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function rem(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function rem(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function and(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function and(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function or(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function or(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function xor(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function xor(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function eq(gtUint16 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function eq(gtUint128 a, gtUint16 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function ne(gtUint16 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function ne(gtUint128 a, gtUint16 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function ge(gtUint16 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function ge(gtUint128 a, gtUint16 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function gt(gtUint16 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function gt(gtUint128 a, gtUint16 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function le(gtUint16 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function le(gtUint128 a, gtUint16 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function lt(gtUint16 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function lt(gtUint128 a, gtUint16 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function min(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function min(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function max(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function max(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function checkedAdd(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAdd(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint16 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint128 a, gtUint16 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSub(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSub(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint16 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint128 a, gtUint16 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMul(gtUint16 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMul(gtUint128 a, gtUint16 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint16 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint128 a, gtUint16 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function mux(gtBool bit, gtUint16 a, gtUint128 b) internal returns (gtUint128){
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint16.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function mux(gtBool bit, gtUint128 a, gtUint16 b) internal returns (gtUint128){
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint128.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function transfer(gtUint16 a, gtUint128 b, gtUint8 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint16 b, gtUint8 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint16 a, gtUint128 b, gtUint16 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint16 b, gtUint16 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint16 a, gtUint128 b, gtUint32 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint16 b, gtUint32 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint16 a, gtUint128 b, gtUint64 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint16 b, gtUint64 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint16 a, gtUint128 b, gtUint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint16 b, gtUint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint16 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint128 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+
+
+    function add(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function add(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function sub(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function sub(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function mul(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function mul(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function div(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function div(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function rem(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function rem(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function and(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function and(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function or(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function or(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function xor(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function xor(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function eq(gtUint32 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function eq(gtUint128 a, gtUint32 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function ne(gtUint32 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function ne(gtUint128 a, gtUint32 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function ge(gtUint32 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function ge(gtUint128 a, gtUint32 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function gt(gtUint32 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function gt(gtUint128 a, gtUint32 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function le(gtUint32 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function le(gtUint128 a, gtUint32 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function lt(gtUint32 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function lt(gtUint128 a, gtUint32 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function min(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function min(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function max(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function max(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function checkedAdd(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAdd(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint32 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint128 a, gtUint32 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSub(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSub(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint32 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint128 a, gtUint32 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMul(gtUint32 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMul(gtUint128 a, gtUint32 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint32 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint128 a, gtUint32 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function mux(gtBool bit, gtUint32 a, gtUint128 b) internal returns (gtUint128){
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint32.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function mux(gtBool bit, gtUint128 a, gtUint32 b) internal returns (gtUint128){
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint128.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function transfer(gtUint32 a, gtUint128 b, gtUint8 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint32 b, gtUint8 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint32 a, gtUint128 b, gtUint16 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint32 b, gtUint16 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint32 a, gtUint128 b, gtUint32 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint32 b, gtUint32 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint32 a, gtUint128 b, gtUint64 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint32 b, gtUint64 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint32 a, gtUint128 b, gtUint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint32 b, gtUint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint32 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint128 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+
+
+    function add(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function add(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function sub(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function sub(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function mul(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function mul(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function div(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function div(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function rem(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function rem(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function and(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function and(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function or(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function or(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function xor(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function xor(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function eq(gtUint64 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function eq(gtUint128 a, gtUint64 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function ne(gtUint64 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function ne(gtUint128 a, gtUint64 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function ge(gtUint64 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function ge(gtUint128 a, gtUint64 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function gt(gtUint64 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function gt(gtUint128 a, gtUint64 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function le(gtUint64 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function le(gtUint128 a, gtUint64 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function lt(gtUint64 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function lt(gtUint128 a, gtUint64 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function min(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function min(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function max(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function max(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function checkedAdd(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAdd(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint64 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint128 a, gtUint64 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSub(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSub(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint64 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint128 a, gtUint64 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMul(gtUint64 a, gtUint128 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMul(gtUint128 a, gtUint64 b) internal returns (gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b));
+
+        return checkRes128(gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint64 a, gtUint128 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint128 a, gtUint64 b) internal returns (gtBool, gtUint128) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint128.wrap(res));
+    }
+
+    function mux(gtBool bit, gtUint64 a, gtUint128 b) internal returns (gtUint128){
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint64.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function mux(gtBool bit, gtUint128 a, gtUint64 b) internal returns (gtUint128){
+         return gtUint128.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint128.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function transfer(gtUint64 a, gtUint128 b, gtUint8 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint64 b, gtUint8 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint64 a, gtUint128 b, gtUint16 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint64 b, gtUint16 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint64 a, gtUint128 b, gtUint32 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint64 b, gtUint32 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint64 a, gtUint128 b, gtUint64 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint64 b, gtUint64 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint64 a, gtUint128 b, gtUint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint64 b, gtUint128 amount) internal returns (gtUint128, gtUint128, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint64 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint128 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint128, gtUint128, gtBool, gtUint128){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint128.wrap(new_a), gtUint128.wrap(new_b), gtBool.wrap(res), gtUint128.wrap(new_allowance));
+    }
+
+
+    // =========== Cast 256 bit operations ==============
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transfer(gtUint256 a, gtUint256 b, gtUint8 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint8 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transfer(gtUint256 a, gtUint256 b, gtUint16 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint16 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transfer(gtUint256 a, gtUint256 b, gtUint32 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint32 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transfer(gtUint256 a, gtUint256 b, gtUint64 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint64 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transfer(gtUint256 a, gtUint256 b, gtUint128 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint256 b, gtUint128 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function add(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function add(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function sub(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function sub(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function mul(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function mul(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function div(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function div(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function rem(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function rem(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function and(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function and(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function or(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function or(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function xor(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function xor(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function eq(gtUint8 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function eq(gtUint256 a, gtUint8 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function ne(gtUint8 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function ne(gtUint256 a, gtUint8 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function ge(gtUint8 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function ge(gtUint256 a, gtUint8 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function gt(gtUint8 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function gt(gtUint256 a, gtUint8 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function le(gtUint8 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function le(gtUint256 a, gtUint8 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function lt(gtUint8 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function lt(gtUint256 a, gtUint8 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function min(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function min(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function max(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function max(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function checkedAdd(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAdd(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint8 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint256 a, gtUint8 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSub(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSub(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint8 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint256 a, gtUint8 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMul(gtUint8 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMul(gtUint256 a, gtUint8 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint8 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint256 a, gtUint8 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function mux(gtBool bit, gtUint8 a, gtUint256 b) internal returns (gtUint256){
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint8.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function mux(gtBool bit, gtUint256 a, gtUint8 b) internal returns (gtUint256){
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint256.unwrap(a), gtUint8.unwrap(b)));
+    }
+
+    function transfer(gtUint8 a, gtUint256 b, gtUint8 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint8 b, gtUint8 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint8 a, gtUint256 b, gtUint16 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint8 b, gtUint16 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint8 a, gtUint256 b, gtUint32 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint8 b, gtUint32 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint8 a, gtUint256 b, gtUint64 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint8 b, gtUint64 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint8 a, gtUint256 b, gtUint128 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint8 b, gtUint128 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint8 a, gtUint256 b, gtUint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint8 b, gtUint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint256.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint256.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint256.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint256.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint256.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint256.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint8 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint8.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint8 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint16 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint16.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint16 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint32 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint32.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint32 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint64 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint64.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint64 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint128 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint128.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint128 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint8 b, gtUint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint8.unwrap(b), gtUint256.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint8 a, gtUint256 b, gtUint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint8.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+
+
+    function add(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function add(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function sub(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function sub(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function mul(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function mul(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function div(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function div(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function rem(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function rem(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function and(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function and(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function or(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function or(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function xor(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function xor(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function eq(gtUint16 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function eq(gtUint256 a, gtUint16 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function ne(gtUint16 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function ne(gtUint256 a, gtUint16 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function ge(gtUint16 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function ge(gtUint256 a, gtUint16 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function gt(gtUint16 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function gt(gtUint256 a, gtUint16 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function le(gtUint16 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function le(gtUint256 a, gtUint16 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function lt(gtUint16 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function lt(gtUint256 a, gtUint16 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function min(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function min(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function max(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function max(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function checkedAdd(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAdd(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint16 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint256 a, gtUint16 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSub(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSub(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint16 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint256 a, gtUint16 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMul(gtUint16 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMul(gtUint256 a, gtUint16 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint16 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint256 a, gtUint16 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function mux(gtBool bit, gtUint16 a, gtUint256 b) internal returns (gtUint256){
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint16.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function mux(gtBool bit, gtUint256 a, gtUint16 b) internal returns (gtUint256){
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint256.unwrap(a), gtUint16.unwrap(b)));
+    }
+
+    function transfer(gtUint16 a, gtUint256 b, gtUint8 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint16 b, gtUint8 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint16 a, gtUint256 b, gtUint16 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint16 b, gtUint16 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint16 a, gtUint256 b, gtUint32 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint16 b, gtUint32 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint16 a, gtUint256 b, gtUint64 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint16 b, gtUint64 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint16 a, gtUint256 b, gtUint128 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint16 b, gtUint128 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint16 a, gtUint256 b, gtUint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint16 b, gtUint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint256.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint256.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint256.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint256.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint256.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint256.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint8 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint8.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint8 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint16 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint16.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint16 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint32 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint32.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint32 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint64 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint64.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint64 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint128 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint128.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint128 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint16 b, gtUint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint16.unwrap(b), gtUint256.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint16 a, gtUint256 b, gtUint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint16.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+
+
+    function add(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function add(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function sub(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function sub(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function mul(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function mul(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function div(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function div(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function rem(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function rem(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function and(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function and(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function or(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function or(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function xor(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function xor(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function eq(gtUint32 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function eq(gtUint256 a, gtUint32 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function ne(gtUint32 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function ne(gtUint256 a, gtUint32 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function ge(gtUint32 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function ge(gtUint256 a, gtUint32 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function gt(gtUint32 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function gt(gtUint256 a, gtUint32 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function le(gtUint32 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function le(gtUint256 a, gtUint32 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function lt(gtUint32 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function lt(gtUint256 a, gtUint32 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function min(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function min(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function max(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function max(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function checkedAdd(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAdd(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint32 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint256 a, gtUint32 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSub(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSub(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint32 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint256 a, gtUint32 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMul(gtUint32 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMul(gtUint256 a, gtUint32 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint32 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint256 a, gtUint32 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function mux(gtBool bit, gtUint32 a, gtUint256 b) internal returns (gtUint256){
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint32.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function mux(gtBool bit, gtUint256 a, gtUint32 b) internal returns (gtUint256){
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint256.unwrap(a), gtUint32.unwrap(b)));
+    }
+
+    function transfer(gtUint32 a, gtUint256 b, gtUint8 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint32 b, gtUint8 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint32 a, gtUint256 b, gtUint16 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint32 b, gtUint16 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint32 a, gtUint256 b, gtUint32 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint32 b, gtUint32 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint32 a, gtUint256 b, gtUint64 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint32 b, gtUint64 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint32 a, gtUint256 b, gtUint128 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint32 b, gtUint128 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint32 a, gtUint256 b, gtUint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint32 b, gtUint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint256.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint256.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint256.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint256.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint256.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint256.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint8 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint8.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint8 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint16 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint16.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint16 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint32 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint32.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint32 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint64 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint64.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint64 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint128 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint128.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint128 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint32 b, gtUint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint32.unwrap(b), gtUint256.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint32 a, gtUint256 b, gtUint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint32.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+
+
+    function add(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function add(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function sub(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function sub(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function mul(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function mul(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function div(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function div(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function rem(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function rem(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function and(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function and(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function or(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function or(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function xor(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function xor(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function eq(gtUint64 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function eq(gtUint256 a, gtUint64 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function ne(gtUint64 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function ne(gtUint256 a, gtUint64 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function ge(gtUint64 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function ge(gtUint256 a, gtUint64 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function gt(gtUint64 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function gt(gtUint256 a, gtUint64 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function le(gtUint64 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function le(gtUint256 a, gtUint64 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function lt(gtUint64 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function lt(gtUint256 a, gtUint64 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function min(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function min(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function max(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function max(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function checkedAdd(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAdd(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint64 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint256 a, gtUint64 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSub(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSub(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint64 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint256 a, gtUint64 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMul(gtUint64 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMul(gtUint256 a, gtUint64 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint64 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint256 a, gtUint64 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function mux(gtBool bit, gtUint64 a, gtUint256 b) internal returns (gtUint256){
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint64.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function mux(gtBool bit, gtUint256 a, gtUint64 b) internal returns (gtUint256){
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint256.unwrap(a), gtUint64.unwrap(b)));
+    }
+
+    function transfer(gtUint64 a, gtUint256 b, gtUint8 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint64 b, gtUint8 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint64 a, gtUint256 b, gtUint16 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint64 b, gtUint16 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint64 a, gtUint256 b, gtUint32 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint64 b, gtUint32 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint64 a, gtUint256 b, gtUint64 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint64 b, gtUint64 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint64 a, gtUint256 b, gtUint128 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint64 b, gtUint128 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint64 a, gtUint256 b, gtUint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint64 b, gtUint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint256.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint256.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint256.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint256.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint256.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint256.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint8 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint8.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint8 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint16 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint16.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint16 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint32 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint32.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint32 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint64 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint64.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint64 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint128 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint128.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint128 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint64 b, gtUint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint64.unwrap(b), gtUint256.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint64 a, gtUint256 b, gtUint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint64.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+
+
+    function add(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function add(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Add(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function sub(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function sub(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Sub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function mul(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function mul(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function div(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function div(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Div(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function rem(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function rem(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Rem(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function and(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function and(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            And(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function or(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function or(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Or(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function xor(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function xor(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Xor(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function eq(gtUint128 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function eq(gtUint256 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Eq(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function ne(gtUint128 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function ne(gtUint256 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ne(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function ge(gtUint128 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function ge(gtUint256 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Ge(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function gt(gtUint128 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function gt(gtUint256 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Gt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function le(gtUint128 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function le(gtUint256 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Le(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function lt(gtUint128 a, gtUint256 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function lt(gtUint256 a, gtUint128 b) internal returns (gtBool) {
+        return gtBool.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Lt(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function min(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function min(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Min(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function max(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function max(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Max(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function checkedAdd(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAdd(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint128 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedAddWithOverflowBit(gtUint256 a, gtUint128 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedAdd(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSub(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSub(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint128 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedSubWithOverflowBit(gtUint256 a, gtUint128 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedSub(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMul(gtUint128 a, gtUint256 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMul(gtUint256 a, gtUint128 b) internal returns (gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b));
+
+        return checkRes256(gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint128 a, gtUint256 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function checkedMulWithOverflowBit(gtUint256 a, gtUint128 b) internal returns (gtBool, gtUint256) {
+        (uint256 bit, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            CheckedMul(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b));
+
+        return (gtBool.wrap(bit), gtUint256.wrap(res));
+    }
+
+    function mux(gtBool bit, gtUint128 a, gtUint256 b) internal returns (gtUint256){
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint128.unwrap(a), gtUint256.unwrap(b)));
+    }
+
+    function mux(gtBool bit, gtUint256 a, gtUint128 b) internal returns (gtUint256){
+         return gtUint256.wrap(ExtendedOperations(address(MPC_PRECOMPILE)).
+            Mux(combineEnumsToBytes3(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtBool.unwrap(bit), gtUint256.unwrap(a), gtUint128.unwrap(b)));
+    }
+
+    function transfer(gtUint128 a, gtUint256 b, gtUint8 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint128 b, gtUint8 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint256 b, gtUint16 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint128 b, gtUint16 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint256 b, gtUint32 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint128 b, gtUint32 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint256 b, gtUint64 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint128 b, gtUint64 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint256 b, gtUint128 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint128 b, gtUint128 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint128 a, gtUint256 b, gtUint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transfer(gtUint256 a, gtUint128 b, gtUint256 amount) internal returns (gtUint256, gtUint256, gtBool){
+        (uint256 new_a, uint256 new_b, uint256 res) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            Transfer(combineEnumsToBytes4(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint256.unwrap(amount));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint8 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint16 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint32 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint64 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint128 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint256.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint256 amount, gtUint8 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint8.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint8 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint16 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint32 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint64 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint128 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint256.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint256 amount, gtUint16 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint16.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint8 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint16 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint32 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint64 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint128 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint256.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint256 amount, gtUint32 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint32.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint8 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint16 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint32 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint64 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint128 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint256.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint256 amount, gtUint64 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint64.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint8 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint16 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint32 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint64 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint128 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint256.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint256 amount, gtUint128 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint128.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint8 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint8.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint8 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT8_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint8.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint16 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint16.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint16 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT16_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint16.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint32 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint32.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint32 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT32_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint32.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint64 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint64.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint64 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT64_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint64.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint128 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint128.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint128 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint128.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint256 a, gtUint128 b, gtUint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint256.unwrap(a), gtUint128.unwrap(b), gtUint256.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+    function transferWithAllowance(gtUint128 a, gtUint256 b, gtUint256 amount, gtUint256 allowance) internal returns (gtUint256, gtUint256, gtBool, gtUint256){
+        (uint256 new_a, uint256 new_b, uint256 res, uint256 new_allowance) = ExtendedOperations(address(MPC_PRECOMPILE)).
+            TransferWithAllowance(combineEnumsToBytes5(MPC_TYPE.SUINT128_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, MPC_TYPE.SUINT256_T, ARGS.BOTH_SECRET), gtUint128.unwrap(a), gtUint256.unwrap(b), gtUint256.unwrap(amount), gtUint256.unwrap(allowance));
+        return (gtUint256.wrap(new_a), gtUint256.wrap(new_b), gtBool.wrap(res), gtUint256.wrap(new_allowance));
+    }
+
+
 }
