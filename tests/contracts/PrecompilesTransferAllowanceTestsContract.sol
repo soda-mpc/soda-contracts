@@ -210,6 +210,49 @@ contract PrecompilesTransferAllowanceTestsContract {
         (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a64_s, allGTCastingValues.b32_s, allAmountValues.amount32_s, allAllowanceValues.allowance64_s);
         require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
 
+        // Check all options for casting to 64 while amount is 16
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a64_s, allGTCastingValues.b64_s, allAmountValues.amount16_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a8_s, allGTCastingValues.b64_s, allAmountValues.amount16_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a64_s, allGTCastingValues.b8_s, allAmountValues.amount16_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a16_s, allGTCastingValues.b64_s, allAmountValues.amount16_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a64_s, allGTCastingValues.b16_s, allAmountValues.amount16_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a32_s, allGTCastingValues.b64_s, allAmountValues.amount16_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a64_s, allGTCastingValues.b32_s, allAmountValues.amount16_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+    
+        // Check all options for casting to 64 while amount is 8
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a64_s, allGTCastingValues.b64_s, allAmountValues.amount8_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a8_s, allGTCastingValues.b64_s, allAmountValues.amount8_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a64_s, allGTCastingValues.b8_s, allAmountValues.amount8_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a16_s, allGTCastingValues.b64_s, allAmountValues.amount8_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a64_s, allGTCastingValues.b16_s, allAmountValues.amount8_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a32_s, allGTCastingValues.b64_s, allAmountValues.amount8_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
+
+        (newA_s, newB_s, res_s, newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a64_s, allGTCastingValues.b32_s, allAmountValues.amount8_s, allAllowanceValues.allowance64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s) && newAllowance == MpcCore.decrypt(newAllowance_s), "transferTest: cast 32 failed");
     }
 
 
@@ -234,7 +277,7 @@ contract PrecompilesTransferAllowanceTestsContract {
         allAllowanceValues.allowance16_s = MpcCore.setPublic16(allowance);
         allAllowanceValues.allowance32_s = MpcCore.setPublic32(allowance);
         allAllowanceValues.allowance64_s = MpcCore.setPublic64(allowance);
-        
+
         // Calculate the expected result 
         (gtUint8 newA_s, gtUint8 newB_s, gtBool res_s, gtUint8 newAllowance_s) = MpcCore.transferWithAllowance(allGTCastingValues.a8_s, allGTCastingValues.b8_s, allAmountValues.amount8_s, allAllowanceValues.allowance8_s);
         newA = MpcCore.decrypt(newA_s);

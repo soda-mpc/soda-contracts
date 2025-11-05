@@ -14,6 +14,10 @@ contract PrecompilesTransferTestsContract {
         gtUint32 b32_s;
         gtUint64 a64_s;
         gtUint64 b64_s;
+        gtUint128 a128_s;
+        gtUint128 b128_s;
+        gtUint256 a256_s;
+        gtUint256 b256_s;
     }
 
     struct AllAmountValues {
@@ -21,6 +25,8 @@ contract PrecompilesTransferTestsContract {
         gtUint16 amount16_s;
         gtUint32 amount32_s;
         gtUint64 amount64_s;
+        gtUint128 amount128_s;
+        gtUint256 amount256_s;
         uint8 amount;
     }
 
@@ -198,6 +204,357 @@ contract PrecompilesTransferTestsContract {
         require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 16 failed");
     }
 
+    function computeAndCheckTransfer128(AllGTCastingValues memory allGTCastingValues, AllAmountValues memory allAmountValues, uint8 new_a, uint8 new_b, bool res) public {
+
+        // Check all options for casting to 128 while amount is 128
+        (gtUint128 newA_s, gtUint128 newB_s, gtBool res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b128_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a8_s, allGTCastingValues.b128_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b8_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a16_s, allGTCastingValues.b128_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b16_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a32_s, allGTCastingValues.b128_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b32_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a64_s, allGTCastingValues.b128_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b64_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        // Check all options for casting to 128 while amount is 64
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b128_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a8_s, allGTCastingValues.b128_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b8_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a16_s, allGTCastingValues.b128_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b16_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a32_s, allGTCastingValues.b128_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b32_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a64_s, allGTCastingValues.b128_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b64_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        // Check all options for casting to 128 while amount is 32
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b128_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a8_s, allGTCastingValues.b128_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b8_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a16_s, allGTCastingValues.b128_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b16_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a32_s, allGTCastingValues.b128_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b32_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a64_s, allGTCastingValues.b128_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b64_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        // Check all options for casting to 128 while amount is 16
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b128_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a8_s, allGTCastingValues.b128_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b8_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a16_s, allGTCastingValues.b128_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b16_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a32_s, allGTCastingValues.b128_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b32_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a64_s, allGTCastingValues.b128_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b64_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        // Check all options for casting to 128 while amount is 8
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b128_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a8_s, allGTCastingValues.b128_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b8_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a16_s, allGTCastingValues.b128_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b16_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a32_s, allGTCastingValues.b128_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b32_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a64_s, allGTCastingValues.b128_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b64_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+    }
+
+    function computeAndCheckTransfer256(AllGTCastingValues memory allGTCastingValues, AllAmountValues memory allAmountValues, uint8 new_a, uint8 new_b, bool res) public {
+
+        // Check all options for casting to 256 while amount is 256
+        (gtUint256 newA_s, gtUint256 newB_s, gtBool res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b256_s, allAmountValues.amount256_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a8_s, allGTCastingValues.b256_s, allAmountValues.amount256_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b8_s, allAmountValues.amount256_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a16_s, allGTCastingValues.b256_s, allAmountValues.amount256_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b16_s, allAmountValues.amount256_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a32_s, allGTCastingValues.b256_s, allAmountValues.amount256_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b32_s, allAmountValues.amount256_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a64_s, allGTCastingValues.b256_s, allAmountValues.amount256_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b64_s, allAmountValues.amount256_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b256_s, allAmountValues.amount256_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b128_s, allAmountValues.amount256_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        // Check all options for casting to 256 while amount is 128
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b256_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a8_s, allGTCastingValues.b256_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b8_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a16_s, allGTCastingValues.b256_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b16_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a32_s, allGTCastingValues.b256_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b32_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a64_s, allGTCastingValues.b256_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b64_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b256_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b128_s, allAmountValues.amount128_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        // Check all options for casting to 256 while amount is 64
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b256_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a8_s, allGTCastingValues.b256_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b8_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a16_s, allGTCastingValues.b256_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b16_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a32_s, allGTCastingValues.b256_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b32_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a64_s, allGTCastingValues.b256_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b64_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b256_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b128_s, allAmountValues.amount64_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        // Check all options for casting to 256 while amount is 32
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b256_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a8_s, allGTCastingValues.b256_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b8_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a16_s, allGTCastingValues.b256_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b16_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a32_s, allGTCastingValues.b256_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b32_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a64_s, allGTCastingValues.b256_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b64_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b256_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b128_s, allAmountValues.amount32_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        // Check all options for casting to 256 while amount is 16
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b256_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a8_s, allGTCastingValues.b256_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b8_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a16_s, allGTCastingValues.b256_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b16_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a32_s, allGTCastingValues.b256_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b32_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a64_s, allGTCastingValues.b256_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b64_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b256_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b128_s, allAmountValues.amount16_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        // Check all options for casting to 256 while amount is 8
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b256_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a8_s, allGTCastingValues.b256_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b8_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a16_s, allGTCastingValues.b256_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b16_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a32_s, allGTCastingValues.b256_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b32_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 128 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a64_s, allGTCastingValues.b256_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b64_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a128_s, allGTCastingValues.b256_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+        (newA_s, newB_s, res_s) = MpcCore.transfer(allGTCastingValues.a256_s, allGTCastingValues.b128_s, allAmountValues.amount8_s);
+        require(new_a == MpcCore.decrypt(newA_s) && new_b == MpcCore.decrypt(newB_s) && res == MpcCore.decrypt(res_s), "transferTest: cast 256 failed");
+
+    }
+
 
     function transferTest(uint8 a, uint8 b, uint8 amount) public returns (uint8, uint8, bool) {
         AllGTCastingValues memory allGTCastingValues;
@@ -210,10 +567,16 @@ contract PrecompilesTransferTestsContract {
         allGTCastingValues.b32_s =  MpcCore.setPublic32(b);
         allGTCastingValues.a64_s =  MpcCore.setPublic64(a);
         allGTCastingValues.b64_s =  MpcCore.setPublic64(b);
+        allGTCastingValues.a128_s =  MpcCore.setPublic128(a);
+        allGTCastingValues.b128_s =  MpcCore.setPublic128(b);
+        allGTCastingValues.a256_s =  MpcCore.setPublic256(a);
+        allGTCastingValues.b256_s =  MpcCore.setPublic256(b);
         allAmountValues.amount8_s = MpcCore.setPublic8(amount);
         allAmountValues.amount16_s = MpcCore.setPublic16(amount);
         allAmountValues.amount32_s = MpcCore.setPublic32(amount);
         allAmountValues.amount64_s = MpcCore.setPublic64(amount);
+        allAmountValues.amount128_s = MpcCore.setPublic128(amount);
+        allAmountValues.amount256_s = MpcCore.setPublic256(amount);
         allAmountValues.amount = amount;
         
         // Calculate the expected result 
@@ -230,6 +593,12 @@ contract PrecompilesTransferTestsContract {
 
         // Calculate the result with casting to 64
         computeAndCheckTransfer64(allGTCastingValues, allAmountValues, newA, newB, result);
+
+        // Calculate the result with casting to 128
+        computeAndCheckTransfer128(allGTCastingValues, allAmountValues, newA, newB, result);
+
+        // Calculate the result with casting to 256
+        computeAndCheckTransfer256(allGTCastingValues, allAmountValues, newA, newB, result);
     
         return (newA, newB, result); 
     }

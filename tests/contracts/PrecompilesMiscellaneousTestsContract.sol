@@ -2,54 +2,9 @@
 pragma solidity ^0.8.19;
 
 import "MpcCore.sol";
+import "./TestAbstract.sol";
 
-contract PrecompilesMiscellaneousTestsContract {
-
-    struct AllGTCastingValues {
-        gtUint8 a8_s;
-        gtUint8 b8_s;
-        gtUint16 a16_s;
-        gtUint16 b16_s;
-        gtUint32 a32_s;
-        gtUint32 b32_s;
-        gtUint64 a64_s;
-        gtUint64 b64_s;
-    }
-
-    struct Check16 {
-        gtUint16 res16_16;
-        gtUint16 res8_16;
-        gtUint16 res16_8;
-    }
-
-    struct Check32 {
-        gtUint32 res32_32;
-        gtUint32 res8_32;
-        gtUint32 res32_8;
-        gtUint32 res16_32;
-        gtUint32 res32_16;
-    }
-
-    struct Check64 {
-        gtUint64 res64_64;
-        gtUint64 res8_64;
-        gtUint64 res64_8;
-        gtUint64 res16_64;
-        gtUint64 res64_16;
-        gtUint64 res32_64;
-        gtUint64 res64_32;
-    }
-
-    function setPublicValues(AllGTCastingValues memory castingValues, uint8 a, uint8 b) public{
-        castingValues.a8_s = MpcCore.setPublic8(a);
-        castingValues.b8_s = MpcCore.setPublic8(b);
-        castingValues.a16_s =  MpcCore.setPublic16(a);
-        castingValues.b16_s =  MpcCore.setPublic16(b);
-        castingValues.a32_s =  MpcCore.setPublic32(a);
-        castingValues.b32_s =  MpcCore.setPublic32(b);
-        castingValues.a64_s =  MpcCore.setPublic64(a);
-        castingValues.b64_s =  MpcCore.setPublic64(b);
-    }
+contract PrecompilesMiscellaneousTestsContract is TestAbstract {
 
     uint8 divResult;
     uint8 remResult;
@@ -68,41 +23,6 @@ contract PrecompilesMiscellaneousTestsContract {
     
     function getBoolResult() public view returns (bool) {
         return boolResult;
-    }
-
-    function decryptAndCompareResults16(Check16 memory check16) public returns (uint16){
-
-        // Calculate the result
-        uint16 result = MpcCore.decrypt(check16.res16_16);
-
-        require(result == MpcCore.decrypt(check16.res8_16) && result == MpcCore.decrypt(check16.res16_8), 
-                                "decryptAndCompareAllResults: Failed to decrypt and compare all results");
-
-        return result;
-    }
-
-    function decryptAndCompareResults32(Check32 memory check32) public returns (uint32){
-
-        // Calculate the result
-        uint32 result = MpcCore.decrypt(check32.res32_32);
-
-        require(result == MpcCore.decrypt(check32.res8_32) && result == MpcCore.decrypt(check32.res32_8) 
-                && result == MpcCore.decrypt(check32.res32_16) && result == MpcCore.decrypt(check32.res16_32), 
-                "decryptAndCompareAllResults: Failed to decrypt and compare all results");
-
-        return result;
-    }
-
-    function decryptAndCompareResults64(Check64 memory check64) public returns (uint64){
-        // Calculate the result
-        uint64 result = MpcCore.decrypt(check64.res64_64);
-
-        require(result == MpcCore.decrypt(check64.res8_64) && result == MpcCore.decrypt(check64.res64_8) 
-                && result == MpcCore.decrypt(check64.res64_16) && result == MpcCore.decrypt(check64.res16_64)
-                && result == MpcCore.decrypt(check64.res64_32) && result == MpcCore.decrypt(check64.res32_64), 
-                "decryptAndCompareAllResults: Failed to decrypt and compare all results");
-
-        return result;
     }
 
     function divTest(uint8 a, uint8 b) public returns (uint8) {
@@ -212,6 +132,8 @@ contract PrecompilesMiscellaneousTestsContract {
         Check16 memory check16;
         Check32 memory check32;
         Check64 memory check64;
+        Check128 memory check128;
+        Check256 memory check256;
         setPublicValues(castingValues, a, b);
         gtBool selectionBit_s = MpcCore.setPublic(selectionBit);
         
@@ -246,6 +168,34 @@ contract PrecompilesMiscellaneousTestsContract {
         uint64 res64 = decryptAndCompareResults64(check64);
         require(result == res64, "muxTest: cast 64 failed");
 
+        // Calculate all available mux functions for 128 bits
+        check128.res128_128 =  MpcCore.mux(selectionBit_s, castingValues.a128_s, castingValues.b128_s);
+        check128.res8_128 = MpcCore.mux(selectionBit_s, castingValues.a8_s, castingValues.b128_s);
+        check128.res128_8 = MpcCore.mux(selectionBit_s, castingValues.a128_s, castingValues.b8_s);
+        check128.res16_128 = MpcCore.mux(selectionBit_s, castingValues.a16_s, castingValues.b128_s);
+        check128.res128_16 = MpcCore.mux(selectionBit_s, castingValues.a128_s, castingValues.b16_s);
+        check128.res32_128 = MpcCore.mux(selectionBit_s, castingValues.a32_s, castingValues.b128_s);
+        check128.res128_32 = MpcCore.mux(selectionBit_s, castingValues.a128_s, castingValues.b32_s);
+        check128.res64_128 = MpcCore.mux(selectionBit_s, castingValues.a64_s, castingValues.b128_s);
+        check128.res128_64 = MpcCore.mux(selectionBit_s, castingValues.a128_s, castingValues.b64_s);
+        uint128 res128 = decryptAndCompareResults128(check128);
+        require(result == res128, "muxTest: cast 128 failed");
+
+        // Calculate all available mux functions for 256 bits
+        check256.res256_256 = MpcCore.mux(selectionBit_s, castingValues.a256_s, castingValues.b256_s);
+        check256.res8_256 = MpcCore.mux(selectionBit_s, castingValues.a8_s, castingValues.b256_s);
+        check256.res256_8 = MpcCore.mux(selectionBit_s, castingValues.a256_s, castingValues.b8_s);
+        check256.res16_256 = MpcCore.mux(selectionBit_s, castingValues.a16_s, castingValues.b256_s);
+        check256.res256_16 = MpcCore.mux(selectionBit_s, castingValues.a256_s, castingValues.b16_s);
+        check256.res32_256 = MpcCore.mux(selectionBit_s, castingValues.a32_s, castingValues.b256_s);
+        check256.res256_32 = MpcCore.mux(selectionBit_s, castingValues.a256_s, castingValues.b32_s);
+        check256.res64_256 = MpcCore.mux(selectionBit_s, castingValues.a64_s, castingValues.b256_s);
+        check256.res256_64 = MpcCore.mux(selectionBit_s, castingValues.a256_s, castingValues.b64_s);
+        check256.res128_256 = MpcCore.mux(selectionBit_s, castingValues.a128_s, castingValues.b256_s);
+        check256.res256_128 = MpcCore.mux(selectionBit_s, castingValues.a256_s, castingValues.b128_s);
+        uint256 res256 = decryptAndCompareResults256(check256);
+        require(result == res256, "muxTest: cast 256 failed");
+
         // Check the result with scalar
         require(result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, a, castingValues.b8_s)) && result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, castingValues.a8_s, b)),
                 "muxTest: test 8 bits with scalar failed");
@@ -255,6 +205,10 @@ contract PrecompilesMiscellaneousTestsContract {
                 "muxTest: test 32 bits with scalar failed");
         require(result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, a, castingValues.b64_s)) && result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, castingValues.a64_s, b)),
                 "muxTest: test 64 bits with scalar failed");
+        require(result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, a, castingValues.b128_s)) && result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, castingValues.a128_s, b)),
+                "muxTest: test 128 bits with scalar failed");
+        require(result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, a, castingValues.b256_s)) && result == MpcCore.decrypt(MpcCore.mux(selectionBit_s, castingValues.a256_s, b)),
+                "muxTest: test 256 bits with scalar failed");
 
         return result; 
     }

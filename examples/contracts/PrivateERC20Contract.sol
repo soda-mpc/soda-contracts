@@ -24,8 +24,8 @@ contract PrivateERC20Contract {
     event Transfer(address indexed _from, address indexed _to);
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
     event Approval(address indexed _owner, address indexed _spender);
-    event Balance(address indexed _owner, ctUint64 _balance);
-    event Allowance(address indexed _owner, ctUint64 _allowance);
+    event Balance(address indexed _owner, ctUint256 _balance);
+    event Allowance(address indexed _owner, ctUint256 _allowance);
 
 
     string private _name;
@@ -36,19 +36,19 @@ contract PrivateERC20Contract {
 
     // Mapping of balances of the token holders
     // The balances are stored encrypted by the system aes key
-    mapping(address => ctUint64) private balances;
+    mapping(address => ctUint256) private balances;
     // Mapping of allowances of the token holders
-    mapping(address => mapping(address => ctUint64)) private allowances;
+    mapping(address => mapping(address => ctUint256)) private allowances;
 
     // Create the contract with the name and symbol. Assign the initial supply of tokens to the contract creator.
     // params: name: the name of the token
     //         symbol: the symbol of the token
     //         initialSupply: the initial supply of the token assigned to the contract creator
-    constructor(string memory name_, string memory symbol_, uint64 initialSupply) {
+    constructor(string memory name_, string memory symbol_, uint256 initialSupply) {
         _name = name_;
         _symbol = symbol_;
         _totalSupply = initialSupply;
-        balances[msg.sender] = MpcCore.offBoard(MpcCore.setPublic64(initialSupply));
+        balances[msg.sender] = MpcCore.offBoard(MpcCore.setPublic256(initialSupply));
     }
 
     function name() public view returns (string memory){
@@ -71,12 +71,12 @@ contract PrivateERC20Contract {
     // Since the balance is initially encrypted internally using the system's AES key, the user cannot access it.
     // Thus, the balance undergoes re-encryption using the user's secret key.
     // As a result, the function is not designated as a "view" function.
-    function balanceOf() public returns (ctUint64){
-        ctUint64 balance = balances[msg.sender];
+    function balanceOf() public returns (ctUint256 memory){
+        ctUint256 memory balance = balances[msg.sender];
         // The balance is saved encrypted using the system key. However, to allow the user to access it, the balance needs to be re-encrypted using the user key.
         // Therefore, we decrypt the balance (onBoard) and then encrypt it again using the user key (offBoardToUser).
-        gtUint64 balanceGt = MpcCore.onBoard(balance);
-        ctUint64 userBalance = MpcCore.offBoardToUser(balanceGt, msg.sender);
+        gtUint256 balanceGt = MpcCore.onBoard(balance);
+        ctUint256 memory userBalance = MpcCore.offBoardToUser(balanceGt, msg.sender);
         emit Balance(msg.sender, userBalance);
         return userBalance;
     }
@@ -87,13 +87,9 @@ contract PrivateERC20Contract {
     //         _itSignature: the signature of the amount to transfer
     //         revealRes: indicates if we should reveal the result of the transfer
     // returns: In case revealRes is true, returns the result of the transfer. In case revealRes is false, always returns true
-    function transfer(address _to, ctUint64 _itCT, bytes calldata _itSignature, bool revealRes) public returns (bool success){
-        // Create IT from ciphertext and signature
-        itUint64 memory it;
-        it.ciphertext = _itCT;
-        it.signature = _itSignature;
+    function transfer(address _to, itUint256 calldata _it, bool revealRes) public returns (bool success){
         // Verify the IT and transfer the value
-        gtBool result = contractTransfer(_to, MpcCore.validateCiphertext(it));
+        gtBool result = contractTransfer(_to, MpcCore.validateCiphertext(_it));
         if (revealRes){
             return MpcCore.decrypt(result);
         } else {
@@ -106,7 +102,7 @@ contract PrivateERC20Contract {
     //         _value: the value of the amount to transfer
     //         revealRes: indicates if we should reveal the result of the transfer
     // returns: In case revealRes is true, returns the result of the transfer. In case revealRes is false, always returns true
-    function transfer(address _to, uint64 _value, bool revealRes) public returns (bool success){
+    function transfer(address _to, uint256 _value, bool revealRes) public returns (bool success){
         gtBool result = contractTransferClear(_to, _value);
 
         if (revealRes){
@@ -120,15 +116,14 @@ contract PrivateERC20Contract {
     // params: _to: the address to transfer to
     //         _value: the encrypted value of the amount to transfer
     // returns: The encrypted result of the transfer.
-    function contractTransfer(address _to, gtUint64 _value) public returns (gtBool success){
+    function contractTransfer(address _to, gtUint256 _value) public returns (gtBool success){
         // Check for self-transfer
         if (msg.sender == _to) {
             emit Transfer(msg.sender, _to);
             return MpcCore.setPublic(true);
         }
-
-        (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(msg.sender, _to);
-        (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result) = MpcCore.transfer(fromBalance, toBalance, _value);
+        (gtUint256 fromBalance, gtUint256 toBalance) = getBalances(msg.sender, _to);
+        (gtUint256 newFromBalance, gtUint256 newToBalance, gtBool result) = MpcCore.transfer(fromBalance, toBalance, _value);
 
         emit Transfer(msg.sender, _to);
         setNewBalances(msg.sender, _to, newFromBalance, newToBalance);
@@ -140,15 +135,14 @@ contract PrivateERC20Contract {
     // params: _to: the address to transfer to
     //         _value: the value of the amount to transfer
     // returns: The encrypted result of the transfer.
-    function contractTransferClear(address _to, uint64 _value) public returns (gtBool success){
+    function contractTransferClear(address _to, uint256 _value) public returns (gtBool success){
         // Check for self-transfer
         if (msg.sender == _to) {
             emit Transfer(msg.sender, _to, _value);
             return MpcCore.setPublic(true);
         }
-
-        (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(msg.sender, _to);
-        (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result) = MpcCore.transfer(fromBalance, toBalance, _value);
+        (gtUint256 fromBalance, gtUint256 toBalance) = getBalances(msg.sender, _to);
+        (gtUint256 newFromBalance, gtUint256 newToBalance, gtBool result) = MpcCore.transfer(fromBalance, toBalance, _value);
 
         emit Transfer(msg.sender, _to, _value);
         setNewBalances(msg.sender, _to, newFromBalance, newToBalance);
@@ -163,13 +157,9 @@ contract PrivateERC20Contract {
     //         _itSignature: the signature of the amount to transfer
     //         revealRes: indicates if we should reveal the result of the transfer
     // returns: In case revealRes is true, returns the result of the transfer. In case revealRes is false, always returns true
-    function transferFrom(address _from, address _to, ctUint64 _itCT, bytes calldata _itSignature, bool revealRes) public returns (bool success){
-        // Create IT from ciphertext and signature
-        itUint64 memory it;
-        it.ciphertext = _itCT;
-        it.signature = _itSignature;
+    function transferFrom(address _from, address _to, itUint256 calldata _it, bool revealRes) public returns (bool success){
         // Verify the IT and transfer the value
-        gtBool result = contractTransferFrom(_from, _to, MpcCore.validateCiphertext(it));
+        gtBool result = contractTransferFrom(_from, _to, MpcCore.validateCiphertext(_it));
         if (revealRes){
             return MpcCore.decrypt(result);
         } else {
@@ -183,7 +173,7 @@ contract PrivateERC20Contract {
     //         _value: the value of the amount to transfer
     //         revealRes: indicates if we should reveal the result of the transfer
     // returns: In case revealRes is true, returns the result of the transfer. In case revealRes is false, always returns true
-    function transferFrom(address _from, address _to, uint64 _value, bool revealRes) public returns (bool success){
+    function transferFrom(address _from, address _to, uint256 _value, bool revealRes) public returns (bool success){
         gtBool result = contractTransferFromClear(_from, _to, _value);
         if (revealRes){
             return MpcCore.decrypt(result);
@@ -197,10 +187,10 @@ contract PrivateERC20Contract {
     //         _to: the address to transfer to
     //         _value: the encrypted value of the amount to transfer
     // returns: The encrypted result of the transfer.
-    function contractTransferFrom(address _from, address _to, gtUint64 _value) public returns (gtBool success){
+    function contractTransferFrom(address _from, address _to, gtUint256 _value) public returns (gtBool success){
 
-        (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(_from, _to);
-        gtUint64 allowance = MpcCore.onBoard(getGTAllowance(_from, msg.sender));
+        (gtUint256 fromBalance, gtUint256 toBalance) = getBalances(_from, _to);
+        gtUint256 allowance = MpcCore.onBoard(getGTAllowance(_from, msg.sender));
 
         // Check for self-transfer
         if (_from == _to) {
@@ -209,7 +199,7 @@ contract PrivateERC20Contract {
             return hasSufficientAllowance;
         }
 
-        (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result, gtUint64 newAllowance) = MpcCore.transferWithAllowance(fromBalance, toBalance, _value, allowance);
+        (gtUint256 newFromBalance, gtUint256 newToBalance, gtBool result, gtUint256 newAllowance) = MpcCore.transferWithAllowance(fromBalance, toBalance, _value, allowance);
 
         setApproveValue(_from, msg.sender, MpcCore.offBoard(newAllowance));
         emit Transfer(_from, _to);
@@ -223,17 +213,17 @@ contract PrivateERC20Contract {
     //         _to: the address to transfer to
     //         _value: the value of the amount to transfer
     // returns: The encrypted result of the transfer.
-    function contractTransferFromClear(address _from, address _to, uint64 _value) public returns (gtBool success){
-        (gtUint64 fromBalance, gtUint64 toBalance) = getBalances(_from, _to);
-        gtUint64 allowance = MpcCore.onBoard(getGTAllowance(_from, msg.sender));
+    function contractTransferFromClear(address _from, address _to, uint256 _value) public returns (gtBool success){
+        (gtUint256 fromBalance, gtUint256 toBalance) = getBalances(_from, _to);
+        gtUint256 allowance = MpcCore.onBoard(getGTAllowance(_from, msg.sender));
         // Check for self-transfer
         if (_from == _to) {
             emit Transfer(_from, _to, _value);
-            gtUint64 valueGt = MpcCore.setPublic64(_value);
+            gtUint256 valueGt = MpcCore.setPublic256(_value);
             gtBool hasSufficientAllowance = MpcCore.ge(allowance, valueGt);
             return hasSufficientAllowance;
         }
-        (gtUint64 newFromBalance, gtUint64 newToBalance, gtBool result, gtUint64 newAllowance) = MpcCore.transferWithAllowance(fromBalance, toBalance, _value, allowance);
+        (gtUint256 newFromBalance, gtUint256 newToBalance, gtBool result, gtUint256 newAllowance) = MpcCore.transferWithAllowance(fromBalance, toBalance, _value, allowance);
 
         setApproveValue(_from, msg.sender, MpcCore.offBoard(newAllowance));
         emit Transfer(_from, _to, _value);
@@ -243,20 +233,20 @@ contract PrivateERC20Contract {
     }
 
     // Returns the encrypted balances of the two addresses
-    function getBalances(address _from, address _to) private returns (gtUint64, gtUint64){
-        ctUint64 fromBalance = balances[_from];
-        ctUint64 toBalance = balances[_to];
+    function getBalances(address _from, address _to) private returns (gtUint256, gtUint256){
+        ctUint256 memory fromBalance = balances[_from];
+        ctUint256 memory toBalance = balances[_to];
 
-        gtUint64 gtFromBalance;
-        gtUint64 gtToBalance;
-        if (ctUint64.unwrap(fromBalance) == 0){// 0 means that no allowance has been set
-            gtFromBalance = MpcCore.setPublic64(0);
+        gtUint256 gtFromBalance;
+        gtUint256 gtToBalance;
+        if (ctUint128.unwrap(fromBalance.ciphertextHigh) == 0 && ctUint128.unwrap(fromBalance.ciphertextLow) == 0){// 0 means that no allowance has been set
+            gtFromBalance = MpcCore.setPublic256(0);
         } else {
             gtFromBalance = MpcCore.onBoard(fromBalance);
         }
 
-        if (ctUint64.unwrap(toBalance) == 0){// 0 means that no allowance has been set
-            gtToBalance = MpcCore.setPublic64(0);
+        if (ctUint128.unwrap(toBalance.ciphertextHigh) == 0 && ctUint128.unwrap(toBalance.ciphertextLow) == 0){// 0 means that no allowance has been set
+            gtToBalance = MpcCore.setPublic256(0);
         } else {
             gtToBalance = MpcCore.onBoard(toBalance);
         }
@@ -265,23 +255,19 @@ contract PrivateERC20Contract {
     }
 
     // Sets the new encrypted balances of the two addresses
-    function setNewBalances(address _from, address _to, gtUint64 newFromBalance, gtUint64 newToBalance) private {
-        // Convert the gtUInt64 to ctUint64 and store it in the balances mapping
+    function setNewBalances(address _from, address _to, gtUint256 newFromBalance, gtUint256 newToBalance) private {
+        // Convert the gtUInt256 to ctUint256 and store it in the balances mapping
         balances[_from] = MpcCore.offBoard(newFromBalance);
         balances[_to] = MpcCore.offBoard(newToBalance);
     }
 
     // Sets the new allowance given inside the IT (encrypted and signed value) of the spender
-    function approve(address _spender, ctUint64 _itCT, bytes calldata _itSignature) public returns (bool success){
-        // Create IT using the given CT and signature
-        itUint64 memory it;
-        it.ciphertext = _itCT;
-        it.signature = _itSignature;
-        return approve(_spender, MpcCore.validateCiphertext(it));
+    function approve(address _spender, itUint256 calldata _it) public returns (bool success){
+        return approve(_spender, MpcCore.validateCiphertext(_it));
     }
 
     // Sets the new encrypted allowance of the spender
-    function approve(address _spender, gtUint64 _value) public returns (bool success){
+    function approve(address _spender, gtUint256 _value) public returns (bool success){
         address owner = msg.sender;
         setApproveValue(owner, _spender, MpcCore.offBoard(_value));
         emit Approval(owner, _spender);
@@ -289,39 +275,39 @@ contract PrivateERC20Contract {
     }
 
     // Sets the new allowance of the spender
-    function approveClear(address _spender, uint64 _value) public returns (bool success){
+    function approveClear(address _spender, uint256 _value) public returns (bool success){
         address owner = msg.sender;
-        gtUint64 gt = MpcCore.setPublic64(_value);
+        gtUint256 gt = MpcCore.setPublic256(_value);
         setApproveValue(owner, _spender, MpcCore.offBoard(gt));
         emit Approval(owner, _spender, _value);
         return true;
     }
 
     // Returns the encrypted allowance of the spender. The encryption is done using the msg.sender aes key
-    function allowance(address _owner, address _spender) public returns (ctUint64 remaining){
+    function allowance(address _owner, address _spender) public returns (ctUint256 memory remaining){
         require(_owner == msg.sender || _spender == msg.sender);
             
-        ctUint64 remainingCt = getGTAllowance(_owner, _spender);
-        gtUint64 remainingGt = MpcCore.onBoard(remainingCt);
-        ctUint64 allowance = MpcCore.offBoardToUser(remainingGt, msg.sender);
+        ctUint256 memory remainingCt = getGTAllowance(_owner, _spender);
+        gtUint256 remainingGt = MpcCore.onBoard(remainingCt);
+        ctUint256 memory allowance = MpcCore.offBoardToUser(remainingGt, msg.sender);
         emit Allowance(msg.sender, allowance);
 
         return allowance;
     }
 
     // Returns the encrypted allowance of the spender. The encryption is done using the system aes key
-    function getGTAllowance(address _owner, address _spender) private returns (ctUint64 remaining){
-        // ctUint64 zero = ctUint64.wrap(0);
-        if (ctUint64.unwrap(allowances[_owner][_spender]) == 0) {// 0 means that no allowance has been set
-            gtUint64 zero = MpcCore.setPublic64(0);
+    function getGTAllowance(address _owner, address _spender) private returns (ctUint256 memory remaining){
+        ctUint256 memory allowance = allowances[_owner][_spender];
+        if (ctUint128.unwrap(allowance.ciphertextHigh) == 0 && ctUint128.unwrap(allowance.ciphertextLow) == 0) {// 0 means that no allowance has been set
+            gtUint256 zero = MpcCore.setPublic256(0);
             return MpcCore.offBoard(zero);
         } else {
-            return allowances[_owner][_spender];
+            return allowance;
         }
     }
 
     // Sets the new encrypted allowance of the spender
-    function setApproveValue(address _owner, address _spender, ctUint64 _value) private {
+    function setApproveValue(address _owner, address _spender, ctUint256 memory _value) private {
         allowances[_owner][_spender] = _value;
     }
 
