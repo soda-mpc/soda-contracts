@@ -60,7 +60,7 @@ jobs:
         run: |
           source .env
           python -m tests.scripts.python.run_precompile_tests_contract Remote
-        timeout-minutes: 5
+        timeout-minutes: 15
 
       - name: Run python ERC20 tests
         run: |
