@@ -1,6 +1,6 @@
 import os
 from soda_python_sdk import generate_rsa_keypair, sign, recover_user_key
-from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter, get_user_key_shares
+from lib.python.soda_web3_helper import SodaWeb3Helper, parse_url_parameter
 import logging
 
 FILE_NAME = 'GetUserKeyContract.sol'
@@ -18,6 +18,22 @@ def remove_user_key_from_file(filename):
     with open(filename, 'w') as file:
         for line in temp_lines:
             file.write(line)
+
+def get_user_key_shares(account, contract, receipt):
+    user_key_events = contract.events.UserKey().process_receipt(receipt)
+
+    key_0_share = None
+    key_1_share = None
+    # Filter events for the specific address
+    for event in user_key_events:
+        if event['args']['_owner'].lower() == account.address.lower():
+            key_0_share = event['args']['_keyShare0']
+            key_1_share = event['args']['_keyShare1']
+
+    if key_0_share is None or key_1_share is None:
+        raise Exception("Failed to find the key shares of the account address in the transaction receipt.")
+
+    return key_0_share, key_1_share
 
 
 def main(provider_url: str):

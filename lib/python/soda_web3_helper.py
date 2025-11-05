@@ -12,7 +12,7 @@ LOCAL_PROVIDER_URL = 'http://localhost:7001'
 REMOTE_HTTP_PROVIDER_URL = 'http://testnet.node.sodalabs.net:7000'
 SOLC_VERSION = '0.8.19'
 DEFAULT_GAS_PRICE = 30
-DEFAULT_GAS_LIMIT = 10000000
+DEFAULT_GAS_LIMIT = 20000000
 DEFAULT_CHAIN_ID = 50505050
 MAX_SLEEP_TIME = 600
 MAX_GAS_PRICE = 1000
@@ -32,22 +32,6 @@ def parse_url_parameter():
         return REMOTE_HTTP_PROVIDER_URL
     else:
         return args.provider_url
-
-def get_user_key_shares(account, contract, receipt):
-    user_key_events = contract.events.UserKey().process_receipt(receipt)
-
-    key_0_share = None
-    key_1_share = None
-    # Filter events for the specific address
-    for event in user_key_events:
-        if event['args']['_owner'].lower() == account.address.lower():
-            key_0_share = event['args']['_keyShare0']
-            key_1_share = event['args']['_keyShare1']
-
-    if key_0_share is None or key_1_share is None:
-        raise Exception("Failed to find the key shares of the account address in the transaction receipt.")
-
-    return key_0_share, key_1_share
 
 class SodaWeb3Helper:
     def __init__(self, private_key_string, http_provider_url):
@@ -85,16 +69,6 @@ class SodaWeb3Helper:
             raise Exception(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
         return self.contracts[contract_id]
 
-    def update_contract_address(self, contract_id, contract_address):
-        if contract_id not in self.contracts:
-            raise Exception(f"Contract with id {contract_id} does not exist. Use the 'setup_contract' method to set it up.")
-
-        self.contracts[contract_id] = self.web3.eth.contract(
-            address=contract_address,
-            abi=self.contracts[contract_id].abi,
-            bytecode=self.contracts[contract_id].bytecode)
-        return True
-
     def get_account(self):
         return self.account
 
@@ -117,6 +91,8 @@ class SodaWeb3Helper:
         construct_txn = self._build_transaction(func_to_call, gas_limit, gas_price, chain_id, constructor_args, account)
         receipt = self._sign_and_send_transaction(construct_txn, account)
         if receipt is not None:
+            if receipt.status != 1:
+                raise Exception(f"Contract deployment failed with status: {receipt.status}")
             print(f"Contract deployed at address: {receipt.contractAddress}")
             self.contracts[contract_id] = self.web3.eth.contract(
                 address=receipt.contractAddress, 
@@ -425,6 +401,9 @@ class SodaWeb3Helper:
             return self.web3.eth.send_raw_transaction(raw_tx)
         except Exception as e:
             raise Exception(f"Failed to send the transaction: {e}")
+
+    def get_block(self):
+        return self.web3.eth.get_block('latest', full_transactions=False)
     
 def load_contract(file_path):
     # Ensure the file path is valid
@@ -455,6 +434,11 @@ def compile_contract(file_path, mpc_inst_path="lib/solidity/MpcInterface.sol", m
             file_path: {"content": solidity_code},
         },
         "settings": {
+           "viaIR": True,
+            "optimizer": {
+                "enabled": True,
+                "runs": 200
+            },
             "outputSelection": {
                 "*": {
                     "*": ["metadata", "evm.bytecode", "evm.bytecode.sourceMap"]

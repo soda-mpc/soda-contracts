@@ -35,7 +35,7 @@ requests==2.31.0
 rlp==3.0.0
 rpds-py==0.12.0
 semantic-version==2.10.0
-soda-sdk==0.0.1
+gcevm-sdk==0.0.5
 toolz==0.12.0
 typing_extensions==4.8.0
 urllib3==2.0.7

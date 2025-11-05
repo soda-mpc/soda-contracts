@@ -1,5 +1,5 @@
 import fs from 'fs';
-import {generateRSAKeyPair, sign, reconstructUserKey } from 'soda-sdk'
+import {generateRSAKeyPair, sign, reconstructUserKey } from 'gcevm-sdk'
 import {SodaWeb3Helper, REMOTE_HTTP_PROVIDER_URL} from '../../../lib/js/sodaWeb3Helper.mjs';
 import yargs from "yargs";
 import {hideBin} from "yargs/helpers";

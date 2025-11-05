@@ -2,10 +2,8 @@ import os
 from eth_account import Account
 import sys
 sys.path.append('soda-sdk')
-from soda_python_sdk import prepare_IT, BLOCK_SIZE as block_size, decrypt
-from lib.python.soda_web3_helper import (SodaWeb3Helper, LOCAL_PROVIDER_URL,
-                                         REMOTE_HTTP_PROVIDER_URL, DEFAULT_GAS_LIMIT,
-                                         DEFAULT_GAS_PRICE)
+from soda_python_sdk import decrypt, BLOCK_SIZE, prepare_IT_256
+from lib.python.soda_web3_helper import SodaWeb3Helper, LOCAL_PROVIDER_URL, REMOTE_HTTP_PROVIDER_URL, DEFAULT_GAS_LIMIT, DEFAULT_GAS_PRICE
 from web3.exceptions import TransactionNotFound
 from time import sleep
 import logging
@@ -18,15 +16,22 @@ NONCE = 0
 
 def decrypt_value(my_CTBalance, user_key):
 
+    ctHigh = my_CTBalance.ciphertextHigh
+    ctLow = my_CTBalance.ciphertextLow
+
     # Convert ct to bytes (big-endian)
-    byte_array = my_CTBalance.to_bytes(32, byteorder='big')
+    byte_array_high = ctHigh.to_bytes(32, byteorder='big')
+    byte_array_low = ctLow.to_bytes(32, byteorder='big')
 
     # Split ct into two 128-bit arrays r and cipher
-    cipher = byte_array[:block_size]
-    r = byte_array[block_size:]
+    cipher_high = byte_array_high[:BLOCK_SIZE]
+    r_high = byte_array_high[BLOCK_SIZE:]
+
+    cipher_low = byte_array_low[:BLOCK_SIZE]
+    r_low = byte_array_low[BLOCK_SIZE:]
 
     # Decrypt the cipher
-    decrypted_message = decrypt(user_key, r, cipher)
+    decrypted_message = decrypt(user_key, r_high, cipher_high, r_low, cipher_low)
 
     # Print the decrypted cipher
     decrypted_balance = int.from_bytes(decrypted_message, 'big')
@@ -34,12 +39,32 @@ def decrypt_value(my_CTBalance, user_key):
     return decrypted_balance
 
 
-def get_function_signature(function_abi):
-    # Extract the input types from the ABI
-    input_types = ','.join([param['type'] for param in function_abi.get('inputs', [])])
+def get_tuple_type(param):
+    # For tuple types, we need to get the internal structure
+    if 'components' in param:
+        tuple_types = []
+        # Extract the actual tuple component types
+        for comp in param['components']:
+            if comp['type'] == 'tuple':
+                tuple_types.append(get_tuple_type(comp))
+            else:
+                tuple_types.append(comp['type'])
+        return f"({','.join(tuple_types)})"
+    else:
+        return 'tuple'
 
+def get_function_signature(function_abi):
+    """Get function signature from a provided function ABI"""
+    # Extract the input types from the ABI
+    input_types = []
+    for param in function_abi.get('inputs', []):
+        if param['type'] == 'tuple':
+            input_types.append(get_tuple_type(param))
+        else:
+            input_types.append(param['type'])
+    
     # Generate the function signature
-    return f"{function_abi['name']}({input_types})"
+    return f"{function_abi['name']}({','.join(input_types)})"
 
 def get_encrypted_balance(soda_helper, account, contract):
     function = contract.functions.balanceOf()
@@ -155,12 +180,12 @@ def main(provider_url: str, use_eip191_signature: bool):
     # After the signature is generated, we call prepare input text function and get the input text to use in the real function.
     dummyCT = 0
     dummySignature = bytes(65)
-    function = contract.functions.transfer(alice_address.address, dummyCT, dummySignature, False)
+    function = contract.functions.transfer(alice_address.address, ((dummyCT, dummyCT), dummySignature), False)
     func_sig = get_function_signature(function.abi) # Get the function signature
     # Prepare the input text for the function
-    ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]), use_eip191_signature)
+    it = prepare_IT_256(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]), use_eip191_signature)
     # Create the real function using the prepared IT
-    function = contract.functions.transfer(alice_address.address, ct, signature, False)
+    function = contract.functions.transfer(alice_address.address, it, False)
     # Transfer 5 SOD to Alice
     execute_transaction(soda_helper, account, contract, function, gas_limit=500000)
 
@@ -178,22 +203,22 @@ def main(provider_url: str, use_eip191_signature: bool):
     print("************* Transfer clear ", plaintext_integer, " from my account to Alice *************")
     # Transfer 5 SOD to Alice
     function = contract.functions.transferFrom(account.address, alice_address.address, plaintext_integer, True)
-    execute_transaction(soda_helper, account, contract, function, gas_limit=500000)
+    execute_transaction(soda_helper, account, contract, function, gas_limit=600000)
 
     print("************* Transfer clear ", plaintext_integer, " from my account to Alice *************")
     # Transfer 5 SOD to Alice
     function = contract.functions.contractTransferFromClear(account.address, alice_address.address, plaintext_integer)
-    execute_transaction(soda_helper, account, contract, function, gas_limit=500000)
+    execute_transaction(soda_helper, account, contract, function, gas_limit=600000)
 
     print("************* Transfer IT ", plaintext_integer, " from my account to Alice *************")
     # Transfer 5 SOD to Alice
-    function = contract.functions.transferFrom(account.address, alice_address.address, dummyCT, dummySignature, False) # Dummy function
+    function = contract.functions.transferFrom(account.address, alice_address.address, ((dummyCT, dummyCT), dummySignature), False) # Dummy function
     func_sig = get_function_signature(function.abi) # Get the function signature
     # Prepare the input text for the function
-    ct, signature = prepare_IT(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]), use_eip191_signature)
+    it = prepare_IT_256(plaintext_integer, user_key, account, contract, func_sig, bytes.fromhex(private_key[2:]), use_eip191_signature)
     # Create the real function using the prepared IT
-    function = contract.functions.transferFrom(account.address, alice_address.address, ct, signature, False)
-    tx_hash = execute_transaction(soda_helper, account, contract, function, gas_limit=500000)
+    function = contract.functions.transferFrom(account.address, alice_address.address, it, False)
+    tx_hash = execute_transaction(soda_helper, account, contract, function, gas_limit=700000)
     tx_receipt = None
     while tx_receipt is None:
         try:
