@@ -5,10 +5,10 @@ interface ExtendedOperations {
 
     function OnBoard(bytes1 metaData, uint256 ct) external returns (uint256 result);
     function OnBoard(bytes1 metaData, uint256 ctHigh, uint256 ctLow) external returns (uint256 result);
-    function OffBoard(bytes1 metaData, uint256 ct) external returns (uint256 result);
+    function OffBoard(bytes1 metaData, uint256 gt) external returns (uint256 result);
     function OffBoard256(bytes1 metaData, uint256 gt) external returns (uint256 ctHigh, uint256 ctLow);
-    function OffBoardToUser(bytes1 metaData, uint256 ct, bytes calldata addr) external returns (uint256 result);
-    function OffBoardToUser256(bytes1 metaData, uint256 ct, bytes calldata addr) external returns (uint256 ctHigh, uint256 ctLow);
+    function OffBoardToUser(bytes1 metaData, uint256 gt, bytes calldata addr) external returns (uint256 result);
+    function OffBoardToUser256(bytes1 metaData, uint256 gt, bytes calldata addr) external returns (uint256 ctHigh, uint256 ctLow);
     function SetPublic(bytes1 metaData, uint256 ct) external returns (uint256 result);
     function Rand(bytes1 metaData) external returns (uint256 result);
     function RandBoundedBits(bytes1 metaData, uint8 numBits) external returns (uint256 result);
